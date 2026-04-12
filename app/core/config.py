@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # OpenAI
     OPENAI_API_KEY: str = ""  # ChatGPT API key
 
+    # Astrology API (for chart calculations)  
+    ASTROLOGY_API_KEY: str = ""  # Get key from astrology API provider
+
     class Config:
         env_file = ".env"
         case_sensitive = True

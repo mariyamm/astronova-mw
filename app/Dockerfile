@@ -48,8 +48,8 @@ RUN mkdir -p /app/pdf_output /app/static /app/logs && \
 # Copy application code
 COPY --chown=appuser:appuser . .
 
-# Make start script executable
-RUN chmod +x start.sh
+# Make scripts executable
+RUN chmod +x start.sh test_imports.sh
 
 # Switch to non-root user
 USER appuser
