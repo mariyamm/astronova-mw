@@ -75,6 +75,8 @@ services:
       # External API Keys (set these in Render dashboard)
       - key: OPENAI_API_KEY
         sync: false
+      - key: ASTROLOGY_API_KEY
+        sync: false
       - key: TIMEZONEDB_API_KEY
         sync: false
       
@@ -139,6 +141,8 @@ services:
       
       # External API Keys
       - key: OPENAI_API_KEY
+        sync: false
+      - key: ASTROLOGY_API_KEY
         sync: false
       
       # Google Drive Integration (for PDF uploads)

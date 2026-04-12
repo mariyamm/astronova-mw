@@ -8,6 +8,7 @@ API Documentation: https://api.astrology-api.io/
 """
 
 import httpx
+import os
 from typing import Dict, Any, Optional
 from datetime import datetime
 
@@ -16,7 +17,7 @@ class AstrologyAPIService:
     """Service for interacting with Astrology API"""
     
     BASE_URL = "https://api.astrology-api.io/api/v3"
-    API_KEY = "ask_16954fd6f59bfd1a99f74d9bb3e301a4dae33fe6a2ad391af33d27a20f492abb"
+    API_KEY = os.getenv("ASTROLOGY_API_KEY", "ask_16954fd6f59bfd1a99f74d9bb3e301a4dae33fe6a2ad391af33d27a20f492abb")
     
     # Default chart options
     DEFAULT_HOUSE_SYSTEM = "P"  # Placidus  house system

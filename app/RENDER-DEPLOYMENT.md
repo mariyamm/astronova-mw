@@ -33,6 +33,9 @@ After deployment, you'll need to set these environment variables in the Render d
 # OpenAI (for report generation)
 OPENAI_API_KEY=sk-your-openai-key-here
 
+# Astrology API (for chart calculations)
+ASTROLOGY_API_KEY=ask_your-astrology-api-key-here
+
 # Shopify (for order sync)
 SHOPIFY_SHOP_URL=your-store.myshopify.com
 SHOPIFY_ACCESS_TOKEN=shpat_your-access-token
