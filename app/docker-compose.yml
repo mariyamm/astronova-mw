@@ -1,0 +1,107 @@
+
+version: '3.8'
+
+services:
+
+  db:
+    image: postgres:15
+    container_name: astronova_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: astronova
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d astronova"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - astronova-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: astronova_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - astronova-network
+
+  api:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev  # Use development Dockerfile
+    container_name: astronova_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/astronova
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=true
+      - SECRET_KEY=dev-secret-key-change-in-production
+    env_file:
+      - .env  # Load sensitive data from .env file
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app:cached  # Bind mount for development hot reload
+      - pdf_output:/app/pdf_output
+      - /app/__pycache__  # Exclude cache from host
+    networks:
+      - astronova-network
+
+  celery_worker:
+    build: 
+      context: .
+      dockerfile: Dockerfile.worker.dev  # Use development worker Dockerfile
+    container_name: astronova_celery
+    restart: unless-stopped
+    command: celery -A services.pdf_tasks worker --loglevel=info --concurrency=2 -Q pdf
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/astronova
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=true
+    env_file:
+      - .env  # Load sensitive data from .env file
+    volumes:
+      - .:/app:cached  # Bind mount for development
+      - pdf_output:/app/pdf_output
+      - /app/__pycache__  # Exclude cache from host
+    networks:
+      - astronova-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pdf_output:
+    driver: local
+
+networks:
+  astronova-network:
+    driver: bridge

@@ -1,0 +1,213 @@
+# =============================================================================
+# 🚀 Deploy to Render.com: 
+# =============================================================================
+# 1. Fork this repo to your GitHub account
+# 2. Go to https://dashboard.render.com
+# 3. Click "New" → "Blueprint"  
+# 4. Connect your GitHub repo
+# 5. Render will detect this file automatically
+# 6. Set your API keys in the dashboard (see RENDER-DEPLOYMENT.md)
+# 
+# Validation: After deployment, run:
+#   python validate_deployment.py https://your-app.onrender.com
+#   .\validate_deployment.ps1 https://your-app.onrender.com
+# =============================================================================
+
+databases:
+  - name: astronova-db
+    databaseName: astronova
+    plan: starter  # Upgrade from free for production use
+    region: oregon # Choose region closest to your users
+    # postgresMajorVersion: 15  # Specify version for consistency
+
+services:
+  # Redis Cache & Task Queue
+  - type: redis
+    name: astronova-redis
+    plan: starter  # Upgrade from free for production
+    region: oregon
+    maxmemoryPolicy: allkeys-lru  # Better for production workloads
+    
+  # Main FastAPI Application  
+  - type: web
+    name: astronova-api
+    runtime: docker
+    dockerfilePath: ./app/Dockerfile
+    dockerContext: ./app
+    region: oregon
+    plan: starter
+    scaling:
+      minInstances: 1
+      maxInstances: 3  # Auto-scale based on traffic
+    healthCheckPath: /api/admin/health
+    envVars:
+      # Database & Cache
+      - key: DATABASE_URL
+        fromDatabase:
+          name: astronova-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: astronova-redis
+          type: redis
+          property: connectionString
+      
+      # Application Configuration
+      - key: APP_NAME
+        value: "AstroNova API"
+      - key: APP_VERSION
+        value: "1.0.0"
+      - key: DEBUG
+        value: "False"
+      - key: PORT
+        value: "8000"
+      
+      # Security
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: "HS256"
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+      - key: BACKEND_CORS_ORIGINS
+        value: "https://astronova-api.onrender.com"
+      
+      # External API Keys (set these in Render dashboard)
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TIMEZONEDB_API_KEY
+        sync: false
+      
+      # Shopify Integration
+      - key: SHOPIFY_SHOP_URL
+        sync: false
+      - key: SHOPIFY_ACCESS_TOKEN
+        sync: false
+      - key: SHOPIFY_API_VERSION
+        value: "2024-01"
+      - key: SHOPIFY_WEBHOOK_SECRET
+        sync: false
+      
+      # Google Drive Integration  
+      - key: GDRIVE_TOKEN_JSON
+        sync: false
+      - key: GDRIVE_CLIENT_JSON
+        sync: false
+      - key: GDRIVE_FOLDER_NAME
+        value: "AstroNova PDFs"
+        
+    # Persistent storage for PDF files
+    disk:
+      name: pdf-storage-api
+      mountPath: /app/pdf_output
+      sizeGB: 2  # Increased storage for production
+      
+    # Custom domains (configure in Render dashboard)
+    # domains:
+    #   - astronova.yourdomain.com
+
+  # Background PDF Generation Worker
+  - type: worker
+    name: astronova-worker
+    runtime: docker
+    dockerfilePath: ./app/Dockerfile.worker  # Use specialized worker image
+    dockerContext: ./app
+    region: oregon
+    plan: starter
+    scaling:
+      minInstances: 1
+      maxInstances: 2  # Scale workers based on queue length
+    # Optimized worker command for production
+    startCommand: celery -A services.pdf_tasks worker --loglevel=info --concurrency=2 -Q pdf --max-tasks-per-child=1000 --prefetch-multiplier=1 --without-gossip
+    envVars:
+      # Database & Cache (same as API)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: astronova-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: astronova-redis
+          type: redis
+          property: connectionString
+          
+      # Worker-specific configuration
+      - key: CELERY_WORKER_MAX_MEMORY_PER_CHILD
+        value: "512000"
+      - key: CELERY_WORKER_CONCURRENCY
+        value: "2"
+      
+      # External API Keys
+      - key: OPENAI_API_KEY
+        sync: false
+      
+      # Google Drive Integration (for PDF uploads)
+      - key: GDRIVE_TOKEN_JSON
+        sync: false
+      - key: GDRIVE_CLIENT_JSON
+        sync: false
+      - key: GDRIVE_FOLDER_NAME
+        value: "AstroNova PDFs"
+        
+    # Shared storage with API for PDF files
+    disk:
+      name: pdf-storage-worker
+      mountPath: /app/pdf_output
+      sizeGB: 2
+
+  # Optional: Flower (Celery Monitoring) - Enable for production monitoring
+  # - type: web
+  #   name: astronova-monitor
+  #   runtime: docker
+  #   dockerfilePath: ./app/Dockerfile.worker
+  #   dockerContext: ./app
+  #   region: oregon
+  #   plan: starter
+  #   startCommand: celery -A services.pdf_tasks flower --port=8000
+  #   envVars:
+  #     - key: REDIS_URL
+  #       fromService:
+  #         name: astronova-redis
+  #         type: redis
+  #         property: connectionString
+  #     - key: CELERY_BROKER_URL
+  #       fromService:
+  #         name: astronova-redis
+  #         type: redis
+  #         property: connectionString
+
+# =============================================================================
+# Deployment Notes:
+# =============================================================================
+#
+# 1. ENVIRONMENT SETUP:
+#    - Set sync: false variables in Render dashboard under service settings
+#    - Generate strong SECRET_KEY (will be auto-generated)
+#    - Get API keys from OpenAI, Shopify, TimezoneDB, Google Drive
+#
+# 2. PRODUCTION CHECKLIST:
+#    ✅ Upgrade from free plans (starter recommended)
+#    ✅ Configure custom domain if needed
+#    ✅ Set up monitoring (enable Flower service) 
+#    ✅ Configure backups for PostgreSQL
+#    ✅ Set up log aggregation
+#    ✅ Configure auto-scaling rules
+#
+# 3. SCALING GUIDELINES:
+#    - API: Scale based on HTTP requests/response time
+#    - Worker: Scale based on Redis queue length
+#    - Database: Monitor connection count and query performance
+#
+# 4. MONITORING:
+#    - Health checks: /api/admin/health
+#    - Worker status: Enable Flower service
+#    - Logs: Available in Render dashboard
+#    - Metrics: Use Render's built-in monitoring
+#
+# 5. COST OPTIMIZATION:
+#    - Start with starter plans ($7/month each)
+#    - Monitor usage and scale accordingly
+#    - Use auto-scaling to optimize costs
+#    - Consider reserved instances for predictable workloads
+#
+# =============================================================================

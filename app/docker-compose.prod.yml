@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+
+  db:
+    image: postgres:15
+    container_name: astronova_db_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-astronova}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-astronova}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - astronova-network
+    # In production, don't expose DB port publicly
+    # ports:
+    #   - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: astronova_redis_prod
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--pass", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - astronova-network
+    # In production, don't expose Redis port publicly
+    # ports:
+    #   - "6379:6379"
+
+  api:
+    build: 
+      context: .
+      dockerfile: Dockerfile  # Use production Dockerfile
+    container_name: astronova_api_prod
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      - pdf_output:/app/pdf_output
+      - logs:/app/logs
+    networks:
+      - astronova-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  celery_worker:
+    build: 
+      context: .
+      dockerfile: Dockerfile.worker  # Use production worker Dockerfile
+    container_name: astronova_celery_prod
+    restart: unless-stopped
+    command: celery -A services.pdf_tasks worker --loglevel=info --concurrency=2 -Q pdf --max-tasks-per-child=1000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    volumes:
+      - pdf_output:/app/pdf_output
+      - logs:/app/logs
+    networks:
+      - astronova-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # Optional: Add a reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    container_name: astronova_nginx_prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    networks:
+      - astronova-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pdf_output:
+    driver: local
+  logs:
+    driver: local
+
+networks:
+  astronova-network:
+    driver: bridge

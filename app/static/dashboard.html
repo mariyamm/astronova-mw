@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AstroNova Admin</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="https://cdn.shopify.com/s/files/1/0967/1707/8911/files/path256-3-fotor-20251216183219.png?v=1766004778" alt="AstroNova">
+                <h2>AstroNova</h2>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="dashboard.html" class="nav-item active">
+                    <span>👥</span> Потребители
+                </a>
+                <a href="shopify-orders.html" class="nav-item">
+                    <span>🛒</span> Shopify Поръчки
+                </a>
+            </nav>
+
+            <div class="user-info" style="margin-top: auto;">
+                <div class="user-avatar">👤</div>
+                <div class="user-details">
+                    <div class="user-name" id="currentUserName">Loading...</div>
+                    <div class="user-role" id="currentUserRole">...</div>
+                </div>
+                <button class="btn-logout" onclick="logout()">Изход</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <h1>Управление на потребители</h1>
+                    <p class="page-subtitle">Общо: <span id="totalUsers">0</span> потребители (<span id="activeUsers">0</span> активни, <span id="inactiveUsers">0</span> неактивни)</p>
+                </div>
+                <button class="btn-primary" onclick="showCreateUserModal()">
+                    + Създай потребител
+                </button>
+            </header>
+
+            <!-- Users Table -->
+            <div class="content-section">
+                <table class="data-table" id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Потребител</th>
+                            <th>Име</th>
+                            <th>Роля</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <tr>
+                            <td colspan="6" style="text-align: center;">Зареждане...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create/Edit User Modal -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Създай потребител</h2>
+                <button class="modal-close" onclick="closeUserModal()">&times;</button>
+            </div>
+            
+            <form id="userForm">
+                <input type="hidden" id="userId">
+                
+                <div class="form-group">
+                    <label for="username">Потребителско име *</label>
+                    <input type="text" id="username" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="firstName">Име *</label>
+                        <input type="text" id="firstName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lastName">Фамилия *</label>
+                        <input type="text" id="lastName" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Парола *</label>
+                    <input type="password" id="password" minlength="6">
+                    <small>Минимум 6 символа</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="role">Роля *</label>
+                    <select id="role" required>
+                        <option value="user">Потребител</option>
+                        <option value="editor">Редактор</option>
+                        <option value="admin">Администратор</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="isActive" checked>
+                        Активен акаунт
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>Права</label>
+                    <div id="permissionsList" class="permissions-list">
+                        Зареждане на права...
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeUserModal()">Откажи</button>
+                    <button type="submit" class="btn-primary">Запази</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script>
+        let allPermissions = [];
+        let currentUserId = null;
+
+        // Load dashboard stats
+        async function loadDashboardStats() {
+            try {
+                const response = await fetchWithAuth('/api/admin/stats');
+                const stats = await response.json();
+
+                document.getElementById('totalUsers').textContent = stats.total_users;
+                document.getElementById('activeUsers').textContent = stats.active_users;
+                document.getElementById('inactiveUsers').textContent = stats.inactive_users;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load users
+        async function loadUsers() {
+            try {
+                const response = await fetchWithAuth('/api/users/');
+                const users = await response.json();
+
+                const tbody = document.getElementById('usersTableBody');
+                
+                if (users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Няма потребители</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = users.map(user => `
+                    <tr>
+                        <td>${user.id}</td>
+                        <td>${user.username}</td>
+                        <td>${user.first_name} ${user.last_name}</td>
+                        <td><span class="role-badge ${user.role}">${getRoleLabel(user.role)}</span></td>
+                        <td>
+                            <span class="status-badge ${user.is_active ? 'active' : 'inactive'}">
+                                ${user.is_active ? 'Активен' : 'Неактивен'}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="btn-icon" onclick="editUser(${user.id})" title="Редактирай">✏️</button>
+                            <button class="btn-icon" onclick="deleteUser(${user.id})" title="Изтрий">🗑️</button>
+                        </td>
+                    </tr>
+                `).join('');
+                
+                // Reload stats after loading users
+                loadDashboardStats();
+            } catch (error) {
+                console.error('Error loading users:', error);
+                alert('Грешка при зареждане на потребители');
+            }
+        }
+
+        // Load permissions
+        async function loadPermissions() {
+            try {
+                const response = await fetchWithAuth('/api/permissions/');
+                allPermissions = await response.json();
+            } catch (error) {
+                console.error('Error loading permissions:', error);
+            }
+        }
+
+        // Show create user modal
+        function showCreateUserModal() {
+            currentUserId = null;
+            document.getElementById('modalTitle').textContent = 'Създай потребител';
+            document.getElementById('userForm').reset();
+            document.getElementById('userId').value = '';
+            document.getElementById('password').required = true;
+            document.getElementById('isActive').checked = true;
+            
+            renderPermissionsList([]);
+            document.getElementById('userModal').style.display = 'flex';
+        }
+
+        // Edit user
+        async function editUser(userId) {
+            try {
+                const response = await fetchWithAuth(`/api/users/${userId}`);
+                const user = await response.json();
+
+                currentUserId = userId;
+                document.getElementById('modalTitle').textContent = 'Редактирай потребител';
+                document.getElementById('userId').value = user.id;
+                document.getElementById('username').value = user.username;
+                document.getElementById('firstName').value = user.first_name;
+                document.getElementById('lastName').value = user.last_name;
+                document.getElementById('password').value = '';
+                document.getElementById('password').required = false;
+                document.getElementById('role').value = user.role;
+                document.getElementById('isActive').checked = user.is_active;
+
+                const permissionIds = user.permissions.map(p => p.id);
+                renderPermissionsList(permissionIds);
+
+                document.getElementById('userModal').style.display = 'flex';
+            } catch (error) {
+                console.error('Error loading user:', error);
+                alert('Грешка при зареждане на потребител');
+            }
+        }
+
+        // Render permissions list
+        function renderPermissionsList(selectedIds) {
+            const container = document.getElementById('permissionsList');
+            
+            if (allPermissions.length === 0) {
+                container.innerHTML = '<p>Няма налични права</p>';
+                return;
+            }
+
+            container.innerHTML = allPermissions.map(perm => `
+                <label class="permission-item">
+                    <input type="checkbox" 
+                           name="permissions" 
+                           value="${perm.id}" 
+                           ${selectedIds.includes(perm.id) ? 'checked' : ''}>
+                    ${perm.name}
+                    <small>${perm.description || ''}</small>
+                </label>
+            `).join('');
+        }
+
+        // Close modal
+        function closeUserModal() {
+            document.getElementById('userModal').style.display = 'none';
+            currentUserId = null;
+        }
+
+        // Handle form submission
+        document.getElementById('userForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const permissionCheckboxes = document.querySelectorAll('input[name="permissions"]:checked');
+            const permissionIds = Array.from(permissionCheckboxes).map(cb => parseInt(cb.value));
+
+            const userData = {
+                username: document.getElementById('username').value,
+                first_name: document.getElementById('firstName').value,
+                last_name: document.getElementById('lastName').value,
+                role: document.getElementById('role').value,
+                is_active: document.getElementById('isActive').checked,
+                permission_ids: permissionIds
+            };
+
+            const password = document.getElementById('password').value;
+            if (password) {
+                userData.password = password;
+            }
+
+            try {
+                let response;
+                if (currentUserId) {
+                    // Update user
+                    response = await fetchWithAuth(`/api/users/${currentUserId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(userData)
+                    });
+                } else {
+                    // Create user
+                    response = await fetchWithAuth('/api/users/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(userData)
+                    });
+                }
+
+                if (response.ok) {
+                    closeUserModal();
+                    loadUsers();
+                    alert('Потребителят е запазен успешно');
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Грешка при запазване');
+                }
+            } catch (error) {
+                console.error('Error saving user:', error);
+                alert('Грешка при запазване на потребител');
+            }
+        });
+
+        // Delete user
+        async function deleteUser(userId) {
+            if (!confirm('Сигурни ли сте, че искате да изтриете този потребител?')) {
+                return;
+            }
+
+            try {
+                const response = await fetchWithAuth(`/api/users/${userId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok || response.status === 204) {
+                    loadUsers();
+                    alert('Потребителят е изтрит');
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Грешка при изтриване');
+                }
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                alert('Грешка при изтриване на потребител');
+            }
+        }
+
+        // Load current user info
+        async function loadCurrentUser() {
+            try {
+                const response = await fetchWithAuth('/api/auth/me');
+                const user = await response.json();
+
+                document.getElementById('currentUserName').textContent = 
+                    `${user.first_name} ${user.last_name}`;
+                document.getElementById('currentUserRole').textContent = 
+                    getRoleLabel(user.role);
+            } catch (error) {
+                console.error('Error loading user info:', error);
+            }
+        }
+
+        function getRoleLabel(role) {
+            const labels = {
+                'admin': 'Администратор',
+                'editor': 'Редактор',
+                'user': 'Потребител'
+            };
+            return labels[role] || role;
+        }
+
+        // Initialize
+        checkAuth();
+        loadDashboardStats();
+        loadUsers();
+        loadPermissions();
+        loadCurrentUser();
+    </script>
+</body>
+</html>

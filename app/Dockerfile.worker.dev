@@ -1,0 +1,77 @@
+FROM python:3.11-slim
+
+# Labels for metadata
+LABEL maintainer="AstroNova Team"
+LABEL version="1.0.0-dev"
+LABEL description="AstroNova - Celery Worker for PDF Generation (Development)"
+LABEL component="worker-dev"
+
+# Set environment variables optimized for development
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    # Development settings
+    DEBUG=True \
+    # Worker-specific settings (lighter for development)
+    CELERY_WORKER_MAX_MEMORY_PER_CHILD=256000 \
+    CELERY_WORKER_CONCURRENCY=1 \
+    MALLOC_TRIM_THRESHOLD_=50000
+
+# Install system dependencies + development tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Core WeasyPrint dependencies
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf-xlib-2.0-0 \
+    libcairo2 \
+    libffi-dev \
+    libglib2.0-0 \
+    shared-mime-info \
+    # Font support
+    fonts-liberation \
+    fonts-dejavu-core \
+    fonts-noto \
+    fonts-noto-color-emoji \
+    fontconfig \
+    # Development utilities
+    curl \
+    git \
+    htop \
+    procps \
+    && fc-cache -fv \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Install Python dependencies (including development packages)
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    # Development and debugging tools
+    pip install --no-cache-dir \
+        psutil \
+        watchfiles \
+        python-dotenv \
+        ipython \
+        flower
+
+# Create necessary directories
+RUN mkdir -p /app/pdf_output /app/logs /app/temp
+
+# Copy application code (will be overridden by volume in development)
+COPY . .
+
+# Development health check (more verbose and frequent)
+HEALTHCHECK --interval=30s --timeout=15s --start-period=10s --retries=2 \
+    CMD celery -A services.pdf_tasks inspect ping -d celery@$HOSTNAME || exit 1
+
+# Development command with more verbose logging
+CMD ["celery", "-A", "services.pdf_tasks", "worker", \
+     "--loglevel=debug", \
+     "--concurrency=1", \
+     "-Q", "pdf", \
+     "--max-tasks-per-child=100", \
+     "--prefetch-multiplier=1", \
+     "-E"]

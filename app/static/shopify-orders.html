@@ -1,0 +1,2224 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AstroNova Admin - Shopify Поръчки</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="https://cdn.shopify.com/s/files/1/0967/1707/8911/files/path256-3-fotor-20251216183219.png?v=1766004778" alt="AstroNova">
+                <h2>AstroNova</h2>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="dashboard.html" class="nav-item">
+                    <span>👥</span> Потребители
+                </a>
+                <a href="shopify-orders.html" class="nav-item active">
+                    <span>🛒</span> Shopify Поръчки
+                </a>
+            </nav>
+
+            <div class="user-info" style="margin-top: auto;">
+                <div class="user-avatar">👤</div>
+                <div class="user-details">
+                    <div class="user-name" id="currentUserName">Loading...</div>
+                    <div class="user-role" id="currentUserRole">...</div>
+                </div>
+                <button class="btn-logout" onclick="logout()">Изход</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header" style="padding-bottom: 15px; margin-bottom: 20px;">
+                <div>
+                    <h1 style="font-size: 26px; margin-bottom: 6px;">Shopify Поръчки</h1>
+                    <p class="page-subtitle" style="font-size: 13px;">Общо: <span id="orderCount" style="font-weight: 600; color: #E2A293;">0</span> поръчки | <span id="analysisCount" style="font-weight: 600; color: #87CEEB;">0</span> анализи</p>
+                </div>
+                <button class="btn-primary" onclick="syncOrders()">
+                    🔄 Синхронизирай
+                </button>
+            </header>
+
+            <!-- Filters -->
+            <div class="content-section" style="padding: 15px 20px; margin-bottom: 20px;">
+                <div class="form-row" style="display: flex; gap: 20px; align-items: center;">
+                    <div class="form-group" style="flex: 1; margin: 0; position: relative;">
+                        <input type="text" id="searchInput" placeholder="🔍 Търси по номер на поръчка или име..." 
+                               onkeyup="filterOrders()" 
+                               oninput="toggleClearButton()"
+                               style="width: 100%; padding: 10px 40px 10px 14px; border: 1px solid rgba(243, 239, 234, 0.2); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; border-radius: 8px; font-size: 13px;">
+                        <button id="clearSearchBtn" onclick="clearSearch()" 
+                                style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: rgba(226, 162, 147, 0.2); border: 1px solid rgba(226, 162, 147, 0.3); color: #E2A293; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;"
+                                onmouseover="this.style.background='rgba(226, 162, 147, 0.3)'"
+                                onmouseout="this.style.background='rgba(226, 162, 147, 0.2)'">
+                            ✕
+                        </button>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label style="font-size: 13px; cursor: pointer; white-space: nowrap;">
+                            <input type="checkbox" id="showProcessedFilter" onchange="filterOrders()" style="cursor: pointer;">
+                            Покажи само необработени
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders Table -->
+            <div class="content-section" style="padding: 20px;">
+                <table class="data-table" id="ordersTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 30px;"></th>
+                            <th style="width: 100px;">Номер</th>
+                            <th style="width: 100px;">Дата</th>
+                            <th>Клиент</th>
+                            <th style="width: 100px;">Статус</th>
+                            <th style="width: 90px;">Сума</th>
+                            <th style="width: 80px; text-align: center;">Анализи</th>
+                            <th style="width: 100px; text-align: center;">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody">
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 20px; font-size: 13px;">Зареждане...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit Analysis Modal -->
+    <div id="editAnalysisModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.75); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+        <div style="background: #5F667B; padding: 32px; border-radius: 12px; width: 700px; max-width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7); border: 1px solid rgba(226, 162, 147, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid rgba(226, 162, 147, 0.2);">
+                <h2 style="color: #F3EFEA; font-size: 20px; margin: 0; font-weight: 700;">Редактиране на анализ</h2>
+                <button onclick="closeEditModal()" style="background: rgba(95, 102, 123, 0.3); border: 1px solid rgba(243, 239, 234, 0.3); color: #F3EFEA; font-size: 20px; cursor: pointer; padding: 4px 10px; border-radius: 8px; width: 36px; height: 36px; line-height: 1; transition: all 0.2s;" onmouseover="this.style.background='rgba(95, 102, 123, 0.5)'" onmouseout="this.style.background='rgba(95, 102, 123, 0.3)'">&times;</button>
+            </div>
+
+            <input type="hidden" id="editAnalysisId">
+
+            <!-- Person 1 Section -->
+            <div style="background: rgba(0, 0, 0, 0.15); padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 3px solid #E2A293;">
+                <h3 style="color: #E2A293; font-size: 15px; margin: 0 0 16px 0; font-weight: 700;">Човек 1</h3>
+                
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 14px;">
+                    <div>
+                        <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Име:</label>
+                        <input type="text" id="editPerson1Name" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(226, 162, 147, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Пол:</label>
+                        <select id="editPerson1Gender" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(226, 162, 147, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                            <option value="">-</option>
+                            <option value="male">Мъж</option>
+                            <option value="female">Жена</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 14px;">
+                    <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Дата и час на раждане:</label>
+                    <input type="datetime-local" id="editPerson1BirthDate" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(226, 162, 147, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                </div>
+
+                <div style="margin-bottom: 14px;">
+                    <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Място на раждане:</label>
+                    <input type="text" id="editPerson1BirthPlace" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(226, 162, 147, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div>
+                        <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Географска ширина:</label>
+                        <input type="number" step="0.0001" id="editPerson1Latitude" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(226, 162, 147, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Географска дължина:</label>
+                        <input type="number" step="0.0001" id="editPerson1Longitude" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(226, 162, 147, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Birthday Location Section (for Solar Return only) -->
+            <div id="birthdayLocationSection" style="display: none; background: rgba(135, 206, 235, 0.15); padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 3px solid #87CEEB;">
+                <h3 style="color: #87CEEB; font-size: 15px; margin: 0 0 16px 0; font-weight: 700;">🎂 Соларна карта - Детайли</h3>
+                
+                <div style="margin-bottom: 14px;">
+                    <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">📅 Година на соларната карта:</label>
+                    <input type="number" id="editSolarReturnYear" min="2000" max="2100" placeholder="напр. 2025" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(135, 206, 235, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                </div>
+                
+                <div style="margin-bottom: 14px;">
+                    <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Място на празнуване:</label>
+                    <input type="text" id="editPerson1BirthdayLocation" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(135, 206, 235, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div>
+                        <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Географска ширина:</label>
+                        <input type="number" step="0.0001" id="editPerson1BirthdayLatitude" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(135, 206, 235, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Географска дължина:</label>
+                        <input type="number" step="0.0001" id="editPerson1BirthdayLongitude" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(135, 206, 235, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Person 2 Section (for couple analyses) -->
+            <div id="person2Section" style="display: none; background: rgba(0, 0, 0, 0.15); padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 3px solid #F6D6D0;">
+                <h3 style="color: #F6D6D0; font-size: 15px; margin: 0 0 16px 0; font-weight: 700;">Човек 2</h3>
+                
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 14px;">
+                    <div>
+                        <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Име:</label>
+                        <input type="text" id="editPerson2Name" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(246, 214, 208, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Пол:</label>
+                        <select id="editPerson2Gender" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(246, 214, 208, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                            <option value="">-</option>
+                            <option value="male">Мъж</option>
+                            <option value="female">Жена</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 14px;">
+                    <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Дата и час на раждане:</label>
+                    <input type="datetime-local" id="editPerson2BirthDate" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(246, 214, 208, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                </div>
+
+                <div style="margin-bottom: 14px;">
+                    <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Място на раждане:</label>
+                    <input type="text" id="editPerson2BirthPlace" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(246, 214, 208, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div>
+                        <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Географска ширина:</label>
+                        <input type="number" step="0.0001" id="editPerson2Latitude" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(246, 214, 208, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Географска дължина:</label>
+                        <input type="number" step="0.0001" id="editPerson2Longitude" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(246, 214, 208, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes Section -->
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; color: rgba(243, 239, 234, 0.9); font-size: 12px; margin-bottom: 6px; font-weight: 600;">Бележки:</label>
+                <textarea id="editNotes" rows="3" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid rgba(226, 162, 147, 0.3); background: rgba(0, 0, 0, 0.2); color: #F3EFEA; font-size: 14px; box-sizing: border-box; resize: vertical; font-family: inherit;"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button onclick="closeEditModal()" style="padding: 11px 22px; border-radius: 8px; border: 1px solid rgba(243, 239, 234, 0.3); background: rgba(0, 0, 0, 0.2); color: rgba(243, 239, 234, 0.9); cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.background='rgba(0, 0, 0, 0.3)'" onmouseout="this.style.background='rgba(0, 0, 0, 0.2)'">Отказ</button>
+                <button onclick="saveEditedAnalysis()" style="padding: 11px 22px; border-radius: 8px; border: none; background: #E2A293; color: #1a1a2e; cursor: pointer; font-size: 14px; font-weight: 700; transition: all 0.2s;" onmouseover="this.style.background='#F6D6D0'" onmouseout="this.style.background='#E2A293'">Запази промените</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Solar Return Chart Modal -->
+    <div id="chartModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+        <div style="background: #1a1a2e; padding: 32px; border-radius: 16px; width: 90%; max-width: 1200px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 80px rgba(0, 0, 0, 0.9); border: 2px solid rgba(135, 206, 235, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid rgba(135, 206, 235, 0.2);">
+                <div>
+                    <h2 style="color: #87CEEB; font-size: 24px; margin: 0; font-weight: 700;">🌟 Соларна Карта</h2>
+                    <p id="chartPersonInfo" style="color: rgba(243, 239, 234, 0.7); font-size: 14px; margin: 6px 0 0 0;"></p>
+                    <p id="chartCacheStatus" style="font-size: 12px; margin: 4px 0 0 0;"></p>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button id="chartRegenBtn" onclick="regenerateSolarChart()" style="display:none; background: rgba(226,162,147,0.2); border: 1px solid #E2A293; color: #E2A293; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; transition: all 0.2s;" onmouseover="this.style.background='rgba(226,162,147,0.3)'" onmouseout="this.style.background='rgba(226,162,147,0.2)'">🔄 Регенерирай</button>
+                    <button id="chartEditBtn" onclick="openChartEditModal()" style="display:none; background: rgba(180,160,255,0.15); border: 1px solid #B4A0FF; color: #B4A0FF; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; transition: all 0.2s;" onmouseover="this.style.background='rgba(180,160,255,0.28)'" onmouseout="this.style.background='rgba(180,160,255,0.15)'">✏️ Редактирай</button>
+                    <button onclick="closeChartModal()" style="background: rgba(95, 102, 123, 0.3); border: 1px solid rgba(243, 239, 234, 0.3); color: #F3EFEA; font-size: 24px; cursor: pointer; padding: 6px 12px; border-radius: 8px; width: 44px; height: 44px; line-height: 1; transition: all 0.2s;" onmouseover="this.style.background='rgba(95, 102, 123, 0.5)'" onmouseout="this.style.background='rgba(95, 102, 123, 0.3)'">&times;</button>
+                </div>
+            </div>
+
+            <div id="chartLoading" style="text-align: center; padding: 60px 20px; color: #87CEEB;">
+                <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+                <div id="chartLoadingText" style="font-size: 18px; font-weight: 600;">Зареждане на соларна карта...</div>
+                <div style="font-size: 14px; color: rgba(243, 239, 234, 0.6); margin-top: 8px;">Моля изчакайте...</div>
+            </div>
+
+            <div id="chartContent" style="display: none;">
+                <!-- Main Chart Table (full width) -->
+                <div id="chartMainSection" style="display: none; margin-bottom: 24px;">
+                    <div style="background: rgba(135, 206, 235, 0.1); padding: 20px; border-radius: 12px; border: 1px solid rgba(135, 206, 235, 0.3);">
+                        <h3 style="color: #87CEEB; font-size: 16px; margin: 0 0 16px 0; font-weight: 700;">🪐 Соларна Карта - Планетни Позиции</h3>
+                        <div id="chartMainTable" style="font-size: 13px; color: #F3EFEA; max-height: 600px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+                
+                <!-- Chart Visualization Grid (for separate data) -->
+                <div id="chartGridSection" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+                    <!-- Planets Section -->
+                    <div style="background: rgba(135, 206, 235, 0.1); padding: 20px; border-radius: 12px; border: 1px solid rgba(135, 206, 235, 0.3);">
+                        <h3 style="color: #87CEEB; font-size: 16px; margin: 0 0 16px 0; font-weight: 700;">🪐 Планети</h3>
+                        <div id="chartPlanets" style="font-size: 13px; color: #F3EFEA; max-height: 500px; overflow-y: auto;"></div>
+                    </div>
+
+                    <!-- Houses Section -->
+                    <div style="background: rgba(226, 162, 147, 0.1); padding: 20px; border-radius: 12px; border: 1px solid rgba(226, 162, 147, 0.3);">
+                        <h3 style="color: #E2A293; font-size: 16px; margin: 0 0 16px 0; font-weight: 700;">🏠 Къщи</h3>
+                        <div id="chartHouses" style="font-size: 13px; color: #F3EFEA; max-height: 500px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+
+                <!-- Aspects Section -->
+                <div id="chartAspectsSection" style="background: rgba(246, 214, 208, 0.1); padding: 20px; border-radius: 12px; border: 1px solid rgba(246, 214, 208, 0.3); margin-bottom: 24px;">
+                    <h3 style="color: #F6D6D0; font-size: 16px; margin: 0 0 16px 0; font-weight: 700;">✨ Аспекти</h3>
+                    <div id="chartAspects" style="font-size: 13px; color: #F3EFEA; max-height: 400px; overflow-y: auto;"></div>
+                </div>
+
+                <!-- Raw Data (collapsible for debugging) -->
+                <details style="margin-top: 20px; background: rgba(0, 0, 0, 0.2); padding: 16px; border-radius: 8px;">
+                    <summary style="color: rgba(243, 239, 234, 0.6); cursor: pointer; font-size: 12px; font-weight: 600;">📊 Пълни данни (JSON)</summary>
+                    <pre id="chartRawData" style="background: #000; color: #0f0; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 11px; margin-top: 12px; max-height: 400px; overflow-y: auto;"></pre>
+                </details>
+            </div>
+
+            <div id="chartError" style="display: none; text-align: center; padding: 40px 20px; color: #E2A293;">
+                <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                <div style="font-size: 18px; font-weight: 600;" id="chartErrorMessage"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== Chart Edit Modal ===================== -->
+    <div id="chartEditModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.82); z-index:2100; align-items:center; justify-content:center; backdrop-filter:blur(6px);">
+        <div style="background:#1a1a2e; border-radius:16px; width:92%; max-width:720px; max-height:88vh; display:flex; flex-direction:column; border:2px solid rgba(180,160,255,0.35); box-shadow:0 25px 80px rgba(0,0,0,0.95); overflow:hidden;">
+            <!-- Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid rgba(180,160,255,0.2); flex-shrink:0;">
+                <h3 style="margin:0; color:#B4A0FF; font-size:16px; font-weight:700;">✏️ Редактиране на соларна карта</h3>
+                <button onclick="closeChartEditModal()" style="background:none; border:none; color:rgba(243,239,234,0.6); font-size:22px; cursor:pointer; line-height:1; padding:2px 8px;">&times;</button>
+            </div>
+            <!-- Table body -->
+            <div id="chartEditTableWrap" style="overflow-y:auto; flex:1; padding:16px 24px;">
+                <p style="color:rgba(243,239,234,0.5); font-size:12px; margin:0 0 14px 0;">Промени зодия и/или дом за избрани планети и натисни <strong style="color:#B4A0FF;">Запази</strong>.</p>
+                <table id="chartEditTable" style="width:100%; border-collapse:collapse; font-size:13px;"></table>
+            </div>
+            <!-- Footer -->
+            <div style="display:flex; gap:10px; justify-content:flex-end; padding:14px 24px; border-top:1px solid rgba(180,160,255,0.15); flex-shrink:0;">
+                <span id="chartEditStatus" style="flex:1; display:flex; align-items:center; color:rgba(243,239,234,0.5); font-size:12px;"></span>
+                <button onclick="closeChartEditModal()" style="background:rgba(95,102,123,0.3); border:1px solid rgba(243,239,234,0.2); color:rgba(243,239,234,0.7); padding:9px 20px; border-radius:8px; cursor:pointer; font-size:13px;">Отказ</button>
+                <button onclick="saveChartEdits(this)" style="background:rgba(180,160,255,0.2); border:1px solid #B4A0FF; color:#B4A0FF; padding:9px 22px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='rgba(180,160,255,0.35)'" onmouseout="this.style.background='rgba(180,160,255,0.2)'">💾 Запази</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== Питай Чичи Dialog ===================== -->
+    <div id="chichiDialog" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:4000; align-items:center; justify-content:center;">
+        <div style="background:#1a1a2e; border-radius:14px; padding:28px; width:92%; max-width:520px; border:2px solid rgba(135,206,235,0.4); box-shadow:0 20px 60px rgba(0,0,0,0.9);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <h3 id="chichiDialogTitle" style="margin:0; color:#87CEEB; font-size:16px; font-weight:700;">🤖 Питай Чичи</h3>
+                <button onclick="closeChichiDialog()" style="background:none; border:none; color:rgba(243,239,234,0.6); font-size:20px; cursor:pointer; line-height:1; padding:2px 6px;">&times;</button>
+            </div>
+            <p style="color:rgba(243,239,234,0.6); font-size:12px; margin:0 0 12px 0;">Напиши инструкция — Чичи ще я приложи върху текущия текст в секцията.</p>
+            <textarea id="chichiInstructionInput"
+                placeholder="напр. Направи го по-кратко, съсредоточи се върху кариерата, добави повече за Венера..."
+                style="width:100%; box-sizing:border-box; height:110px; background:rgba(0,0,0,0.3); border:1px solid rgba(135,206,235,0.3); border-radius:8px; color:#F3EFEA; font-size:13px; padding:10px 12px; resize:vertical; outline:none; font-family:inherit;"
+                onkeydown="if(event.ctrlKey && event.key==='Enter') submitChichiPrompt();"
+            ></textarea>
+            <p style="color:rgba(243,239,234,0.35); font-size:11px; margin:6px 0 16px 0;">Ctrl+Enter за изпращане</p>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button onclick="closeChichiDialog()" style="background:rgba(95,102,123,0.3); border:1px solid rgba(243,239,234,0.2); color:rgba(243,239,234,0.7); padding:8px 18px; border-radius:7px; cursor:pointer; font-size:12px;">Отказ</button>
+                <button onclick="submitChichiPrompt()" style="background:rgba(135,206,235,0.2); border:1px solid #87CEEB; color:#87CEEB; padding:8px 20px; border-radius:7px; cursor:pointer; font-size:12px; font-weight:700;">🤖 Изпрати</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== Solar Card Popup ===================== -->
+    <div id="solarCardPopup" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:5000; align-items:center; justify-content:center;">
+        <div style="background:#12121f; border-radius:14px; padding:0; width:96%; max-width:560px; max-height:85vh; border:2px solid rgba(135,206,235,0.35); box-shadow:0 24px 70px rgba(0,0,0,0.95); display:flex; flex-direction:column; overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid rgba(135,206,235,0.15); flex-shrink:0;">
+                <h3 style="margin:0; color:#87CEEB; font-size:15px; font-weight:700;">🔭 Соларна карта</h3>
+                <button onclick="closeSolarCardPopup()" style="background:none; border:none; color:rgba(243,239,234,0.6); font-size:22px; cursor:pointer; line-height:1; padding:2px 8px;">&times;</button>
+            </div>
+            <div id="solarCardPopupBody" style="overflow-y:auto; padding:0; flex:1;">
+                <div id="solarCardPopupLoading" style="padding:30px; text-align:center; color:rgba(135,206,235,0.7); font-size:13px;">⏳ Зареждане на картата...</div>
+                <div id="solarCardPopupTable" style="display:none;"></div>
+                <div id="solarCardPopupError" style="display:none; padding:20px; color:#E2A293; font-size:13px;">Грешка при зареждане.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== Solar Return Report Modal ===================== -->
+    <div id="solarReportModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.88); z-index:3000; align-items:flex-start; justify-content:center; backdrop-filter:blur(8px); overflow-y:auto; padding:30px 0;">
+        <div style="background:#1a1a2e; padding:32px; border-radius:16px; width:92%; max-width:860px; box-shadow:0 25px 80px rgba(0,0,0,0.9); border:2px solid rgba(246,214,208,0.35); margin:auto;">
+
+            <!-- Header -->
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; padding-bottom:16px; border-bottom:2px solid rgba(246,214,208,0.2);">
+                <div>
+                    <h2 style="color:#F6D6D0; font-size:22px; margin:0; font-weight:700;">☀️ Соларен Анализ</h2>
+                    <p id="reportPersonInfo" style="color:rgba(243,239,234,0.7); font-size:13px; margin:6px 0 0 0;"></p>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center; flex-shrink:0; margin-left:16px; flex-wrap:wrap; justify-content:flex-end;">
+                    <button id="reportGenerateAllBtn" onclick="generateAllSections()" style="background:rgba(246,214,208,0.2); border:1px solid #F6D6D0; color:#F6D6D0; padding:9px 18px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='rgba(246,214,208,0.35)'" onmouseout="this.style.background='rgba(246,214,208,0.2)'">⚡ Генерирай всичко</button>
+                    <button onclick="saveAllSections(this)" style="background:rgba(100,220,130,0.18); border:1px solid #64DC82; color:#64DC82; padding:9px 18px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='rgba(100,220,130,0.32)'" onmouseout="this.style.background='rgba(100,220,130,0.18)'">💾 Запази всичко</button>
+                    <button onclick="copyReportText(this)" style="background:rgba(180,160,255,0.18); border:1px solid #B4A0FF; color:#B4A0FF; padding:9px 18px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='rgba(180,160,255,0.32)'" onmouseout="this.style.background='rgba(180,160,255,0.18)'">📋 Копирай</button>
+                    <button onclick="requestPdfGeneration(this)" style="background:rgba(255,200,100,0.15); border:1px solid #FFC864; color:#FFC864; padding:9px 18px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='rgba(255,200,100,0.28)'" onmouseout="this.style.background='rgba(255,200,100,0.15)'">📄 PDF</button>
+                    <button onclick="closeSolarReportModal()" style="background:rgba(95,102,123,0.3); border:1px solid rgba(243,239,234,0.3); color:#F3EFEA; font-size:22px; cursor:pointer; border-radius:8px; width:40px; height:40px; line-height:1; transition:all 0.2s;" onmouseover="this.style.background='rgba(95,102,123,0.5)'" onmouseout="this.style.background='rgba(95,102,123,0.3)'">&times;</button>
+                </div>
+            </div>
+
+            <!-- Sections will be injected here -->
+            <div id="reportSectionsContainer"></div>
+        </div>
+    </div>
+    <!-- ================================================================== -->
+
+    <script src="auth.js"></script>
+    <script>
+        let allOrders = [];
+        let filteredOrders = []; // Track currently filtered orders
+        let expandedRows = new Set();
+        let currentUser = null;
+
+        // Product type colors - using brand colors
+        const PRODUCT_COLORS = {
+            'love_synastry': '#E2A293',  // Brand accent
+            'detailed_analysis': '#E2A293',  // Brand accent
+            'solar_return': '#87CEEB'  // Sky blue for solar return
+        };
+
+        const PRODUCT_LABELS = {
+            'love_synastry': 'Любовна синастрия',
+            'detailed_analysis': 'Подробен анализ',
+            'solar_return': 'Соларна карта'
+        };
+
+        // Copy person data to clipboard
+        function copyPersonData(analysisId, personNum) {
+            // Find the analysis in allOrders
+            let analysis = null;
+            for (const order of allOrders) {
+                const found = order.analyses?.find(a => a.id === analysisId);
+                if (found) {
+                    analysis = found;
+                    break;
+                }
+            }
+            
+            if (!analysis) {
+                alert('Анализът не е намерен');
+                return;
+            }
+
+            const person = personNum === 1 ? {
+                name: analysis.person1_name,
+                gender: analysis.person1_gender,
+                birthDate: analysis.person1_birth_date,
+                birthPlace: analysis.person1_birth_place,
+                latitude: analysis.person1_latitude,
+                longitude: analysis.person1_longitude,
+                timezone: analysis.person1_timezone,
+                timezoneOffset: analysis.person1_timezone_offset,
+                birthdayLocation: analysis.person1_birthday_location,
+                birthdayLatitude: analysis.person1_birthday_latitude,
+                birthdayLongitude: analysis.person1_birthday_longitude
+            } : {
+                name: analysis.person2_name,
+                gender: analysis.person2_gender,
+                birthDate: analysis.person2_birth_date,
+                birthPlace: analysis.person2_birth_place,
+                latitude: analysis.person2_latitude,
+                longitude: analysis.person2_longitude,
+                timezone: analysis.person2_timezone,
+                timezoneOffset: analysis.person2_timezone_offset
+            };
+
+            const text = `
+Име: ${person.name}
+${person.gender ? 'Пол: ' + getGenderLabel(person.gender) + '\n' : ''}Дата и час на раждане: ${formatBirthDate(person.birthDate)}
+Място на раждане: ${person.birthPlace}
+Географска ширина: ${person.latitude}°
+Географска дължина: ${person.longitude}°
+${person.timezone ? 'Часова зона: ' + person.timezone + ' (UTC ' + person.timezoneOffset + ')\n' : ''}${person.birthdayLocation ? '\n🎂 Място на рожден ден: ' + person.birthdayLocation + '\n' : ''}${person.birthdayLatitude ? 'Рожден ден географска ширина: ' + person.birthdayLatitude + '°\n' : ''}${person.birthdayLongitude ? 'Рожден ден географска дължина: ' + person.birthdayLongitude + '°' : ''}
+            `.trim();
+
+            navigator.clipboard.writeText(text).then(() => {
+                alert('✅ Данните са копирани!');
+            }).catch(err => {
+                console.error('Грешка при копиране:', err);
+                alert('❌ Грешка при копиране');
+            });
+        }
+
+
+        // Sync orders from Shopify
+        async function syncOrders() {
+            try {
+                const btn = event.target;
+                btn.disabled = true;
+                btn.textContent = '⏳ Синхронизиране...';
+
+                const response = await fetchWithAuth('/api/shopify/sync?limit=50');
+                const data = await response.json();
+
+                alert(`Синхронизирани ${data.synced_count} поръчки`);
+                
+                // Reload local orders
+                await loadLocalOrders();
+                
+                btn.disabled = false;
+                btn.textContent = '🔄 Синхронизирай';
+            } catch (error) {
+                console.error('Error syncing orders:', error);
+                alert('Грешка при синхронизиране на поръчки');
+                btn.disabled = false;
+                btn.textContent = '🔄 Синхронизирай';
+            }
+        }
+
+        // Load orders from local database
+        async function loadLocalOrders() {
+            try {
+                const response = await fetchWithAuth('/api/shopify/local/orders?limit=100');
+                allOrders = await response.json();
+
+                document.getElementById('orderCount').textContent = allOrders.length;
+                
+                // Count total analyses
+                const totalAnalyses = allOrders.reduce((sum, order) => sum + (order.analyses?.length || 0), 0);
+                document.getElementById('analysisCount').textContent = totalAnalyses;
+
+                filterOrders();
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                const tbody = document.getElementById('ordersTableBody');
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #E2A293;">Грешка при зареждане на поръчки. Моля, синхронизирайте поръчки.</td></tr>';
+            }
+        }
+
+        // Filter orders based on search and checkboxes
+        function filterOrders() {
+            const searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+            const showOnlyUnprocessed = document.getElementById('showProcessedFilter').checked;
+            
+            filteredOrders = allOrders;
+            
+            // Filter by search text (order number or person names)
+            if (searchText) {
+                filteredOrders = filteredOrders.filter(order => {
+                    // Search in order number
+                    if (order.order_number.toLowerCase().includes(searchText)) {
+                        return true;
+                    }
+                    
+                    // Search in customer name
+                    if (order.customer_name && order.customer_name.toLowerCase().includes(searchText)) {
+                        return true;
+                    }
+                    
+                    // Search in analyses person names
+                    if (order.analyses && order.analyses.length > 0) {
+                        return order.analyses.some(analysis => {
+                            const person1Match = analysis.person1_name && 
+                                                 analysis.person1_name.toLowerCase().includes(searchText);
+                            const person2Match = analysis.person2_name && 
+                                                 analysis.person2_name.toLowerCase().includes(searchText);
+                            return person1Match || person2Match;
+                        });
+                    }
+                    
+                    return false;
+                });
+            }
+            
+            // Filter by processed status
+            if (showOnlyUnprocessed) {
+                filteredOrders = filteredOrders.filter(order => 
+                    order.analyses?.some(analysis => !analysis.is_processed)
+                );
+            }
+            
+            displayOrders(filteredOrders);
+        }
+
+        // Clear search filter
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            toggleClearButton();
+            filterOrders();
+        }
+
+        // Toggle visibility of clear button
+        function toggleClearButton() {
+            const searchInput = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('clearSearchBtn');
+            clearBtn.style.display = searchInput.value.length > 0 ? 'block' : 'none';
+        }
+
+        // Display orders in table
+        function displayOrders(orders) {
+            const tbody = document.getElementById('ordersTableBody');
+            const searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+            
+            if (orders.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Няма намерени поръчки</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = orders.map(order => {
+                const date = order.order_created_at ? new Date(order.order_created_at).toLocaleDateString('bg-BG', {day: '2-digit', month: '2-digit', year: 'numeric'}) : 'N/A';
+                const isExpanded = expandedRows.has(order.id);
+                
+                // Filter analyses based on search text
+                let displayedAnalyses = order.analyses || [];
+                if (searchText) {
+                    // If searching by name, only show matching analyses
+                    const matchesOrderNumber = order.order_number.toLowerCase().includes(searchText);
+                    const matchesCustomerName = order.customer_name && order.customer_name.toLowerCase().includes(searchText);
+                    
+                    // If search matches order number or customer name, show all analyses
+                    // Otherwise, filter analyses by person names
+                    if (!matchesOrderNumber && !matchesCustomerName) {
+                        displayedAnalyses = displayedAnalyses.filter(analysis => {
+                            const person1Match = analysis.person1_name && 
+                                                 analysis.person1_name.toLowerCase().includes(searchText);
+                            const person2Match = analysis.person2_name && 
+                                                 analysis.person2_name.toLowerCase().includes(searchText);
+                            return person1Match || person2Match;
+                        });
+                    }
+                }
+                
+                const analysesCount = displayedAnalyses.length;
+                
+                // Get primary product color (from first displayed analysis)
+                const primaryColor = displayedAnalyses[0] ? PRODUCT_COLORS[displayedAnalyses[0].product_type] : '#E2A293';
+
+                // Create compact analysis summary (completed/total)
+                let analysisSummary = '';
+                if (displayedAnalyses.length > 0) {
+                    const completedCount = displayedAnalyses.filter(a => a.is_processed).length;
+                    const totalCount = displayedAnalyses.length;
+                    const color = completedCount === totalCount ? '#E2A293' : (completedCount > 0 ? '#F3EFEA' : 'rgba(243, 239, 234, 0.5)');
+                    analysisSummary = `<span style="color: ${color}; font-weight: 600;">${completedCount}/${totalCount}</span>`;
+                }
+
+                // Action buttons (only for admin)
+                let actionButtons = '';
+                if (currentUser && currentUser.role === 'admin') {
+                    actionButtons = `
+                        <button onclick="event.stopPropagation(); deleteOrder(${order.id}, '${order.order_number}')" 
+                                style="background: rgba(95, 102, 123, 0.3); border: 1px solid #5F667B; color: #F3EFEA; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s;" 
+                                onmouseover="this.style.background='rgba(95, 102, 123, 0.5)'; this.style.borderColor='#E2A293'" 
+                                onmouseout="this.style.background='rgba(95, 102, 123, 0.3)'; this.style.borderColor='#5F667B'">
+                            Изтрий поръчка
+                        </button>
+                    `;
+                }
+
+                let html = `
+                    <tr style="border-left: 3px solid ${primaryColor}; cursor: pointer; transition: background 0.2s;" onclick="toggleRow(${order.id})" onmouseover="this.style.backgroundColor='#4F566B'" onmouseout="this.style.backgroundColor=''">
+                        <td style="text-align: center; font-size: 12px; width: 30px; padding: 8px 6px;">${isExpanded ? '▼' : '▶'}</td>
+                        <td style="font-weight: 600; font-size: 13px; padding: 8px 10px;">#${order.order_number}</td>
+                        <td style="font-size: 12px; color: rgba(243, 239, 234, 0.9); padding: 8px 10px;">${date}</td>
+                        <td style="font-size: 13px; padding: 8px 10px;">${order.customer_name || '<span style="opacity: 0.6;">Гост</span>'}</td>
+                        <td style="padding: 8px 10px;"><span class="status-badge ${getStatusClass(order.financial_status)}" style="font-size: 11px; padding: 3px 8px;">${getStatusLabel(order.financial_status)}</span></td>
+                        <td style="font-size: 13px; font-weight: 600; color: #E2A293; padding: 8px 10px; white-space: nowrap;">${order.total_price} ${order.currency}</td>
+                        <td style="font-size: 16px; text-align: center; padding: 8px 10px;">${analysisSummary || `<span style="font-size: 12px; color: rgba(243, 239, 234, 0.6);">${analysesCount}</span>`}</td>
+                        <td style="text-align: center; padding: 8px 10px;">${actionButtons}</td>
+                    </tr>
+                `;
+
+                // Add expanded content
+                if (isExpanded) {
+                    if (displayedAnalyses.length > 0) {
+                        html += `
+                            <tr class="expanded-row">
+                                <td colspan="8" style="padding: 0;">
+                                    <div style="padding: 16px; background-color: #4F566B;">
+                                        ${displayedAnalyses.map(analysis => renderAnalysis(analysis, order)).join('')}
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        html += `
+                            <tr class="expanded-row">
+                                <td colspan="8" style="padding: 16px; text-align: center; background-color: #4F566B; color: rgba(243, 239, 234, 0.7); font-size: 13px;">
+                                    ${searchText ? 'Няма анализи, които съответстват на търсенето' : 'Тази поръчка няма анализи'}
+                                </td>
+                            </tr>
+                        `;
+                    }
+                }
+
+                return html;
+            }).join('');
+        }
+
+        // Format date in a readable way
+        function formatBirthDate(dateString) {
+            if (!dateString) return 'N/A';
+            
+            // Parse the datetime string WITHOUT timezone conversion
+            // Birth time is LOCAL time at the birthplace, not UTC
+            const date = new Date(dateString);
+            
+            // Extract components directly from the ISO string to avoid timezone conversion
+            const parts = dateString.split('T');
+            const datePart = parts[0]; // YYYY-MM-DD
+            const timePart = parts[1] ? parts[1].split('+')[0].split(':').slice(0, 2).join(':') : '00:00'; // HH:MM
+            
+            const [year, month, day] = datePart.split('-');
+            
+            // Bulgarian month names
+            const monthNames = ['януари', 'февруари', 'март', 'април', 'май', 'юни', 
+                                'юли', 'август', 'септември', 'октомври', 'ноември', 'декември'];
+            
+            const monthName = monthNames[parseInt(month) - 1];
+            
+            return `${day} ${monthName} ${year} в ${timePart}ч`;
+        }
+
+        // Render analysis details
+        function renderAnalysis(analysis, order) {
+            const color = PRODUCT_COLORS[analysis.product_type];
+            const productLabel = PRODUCT_LABELS[analysis.product_type];
+            const isCoupleAnalysis = analysis.product_type === 'love_synastry';
+            
+            // For single person analysis (detailed_analysis) - compact card
+            if (!isCoupleAnalysis) {
+                return `
+                    <div style="background: #5F667B; padding: 16px; margin-bottom: 12px; border-radius: 8px; border-left: 3px solid ${color}; position: relative; ${analysis.is_processed ? 'opacity: 0.6; filter: grayscale(30%);' : ''}">
+                        
+                        <!-- Header with Product Info -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(243, 239, 234, 0.1);">
+                            <div style="flex: 1;">
+                                <div style="display: inline-block; background: rgba(226, 162, 147, 0.15); padding: 5px 12px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(226, 162, 147, 0.3);">
+                                    <span style="color: ${color}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${productLabel}</span>
+                                </div>
+                                ${analysis.solar_return_year ? `
+                                    <div style="background: rgba(135, 206, 235, 0.2); display: inline-block; padding: 5px 12px; border-radius: 6px; margin-bottom: 6px; margin-left: 6px; border: 1px solid rgba(135, 206, 235, 0.4);">
+                                        <span style="color: #87CEEB; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;">📅 ${analysis.solar_return_year}</span>
+                                    </div>
+                                ` : ''}
+                                ${analysis.variant_title ? `
+                                    <div style="background: rgba(246, 214, 208, 0.15); display: inline-block; padding: 4px 10px; border-radius: 6px; margin-left: 6px; border: 1px solid rgba(246, 214, 208, 0.25);">
+                                        <span style="font-size: 11px; color: #F6D6D0; font-weight: 600;">${analysis.variant_title}</span>
+                                    </div>
+                                ` : ''}
+                                <div style="margin-top: 6px; font-size: 11px; color: rgba(243, 239, 234, 0.7);">
+                                    ${analysis.product_title} • <span style="color: ${color}; font-weight: 600;">${analysis.price} ${order.currency}</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                ${analysis.drive_link ? `
+                                    <button onclick="copyAnalysisDriveLink('${analysis.drive_link}', this); event.stopPropagation();"
+                                            style="background: rgba(130, 200, 130, 0.2); border: 1px solid #82C882; color: #82C882; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 700; transition: all 0.2s;"
+                                            onmouseover="this.style.background='rgba(130, 200, 130, 0.35)'"
+                                            onmouseout="this.style.background='rgba(130, 200, 130, 0.2)'">
+                                        🔗 Копирай линк
+                                    </button>
+                                ` : ''}
+                                ${analysis.product_type === 'solar_return' ? `
+                                    <button onclick="viewSolarReturnChart(${analysis.id}, ${!!analysis.has_solar_chart}); event.stopPropagation();" 
+                                            style="background: ${analysis.has_solar_chart ? 'rgba(135, 206, 235, 0.45)' : 'rgba(135, 206, 235, 0.15)'}; border: 1px solid #87CEEB; color: #87CEEB; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 700; transition: all 0.2s;"
+                                            onmouseover="this.style.background='rgba(135, 206, 235, 0.55)'"
+                                            onmouseout="this.style.background='${analysis.has_solar_chart ? 'rgba(135, 206, 235, 0.45)' : 'rgba(135, 206, 235, 0.15)'}'">
+                                        ${analysis.has_solar_chart ? '✅ Соларна Карта' : '🌟 Соларна Карта'}
+                                    </button>
+                                    <button onclick="viewSolarReport(${analysis.id}); event.stopPropagation();"
+                                            style="background: ${analysis.has_solar_report ? 'rgba(246, 214, 208, 0.4)' : 'rgba(246, 214, 208, 0.12)'}; border: 1px solid #F6D6D0; color: #F6D6D0; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 700; transition: all 0.2s;"
+                                            onmouseover="this.style.background='rgba(246, 214, 208, 0.5)'"
+                                            onmouseout="this.style.background='${analysis.has_solar_report ? 'rgba(246, 214, 208, 0.4)' : 'rgba(246, 214, 208, 0.12)'}'">
+                                        ${analysis.has_solar_report ? '📝 Соларен Анализ' : '✨ Соларен Анализ'}
+                                    </button>
+                                ` : ''}
+                                ${currentUser && currentUser.role === 'admin' ? `
+                                    <button onclick="editAnalysis(${analysis.id}); event.stopPropagation();" 
+                                            style="background: rgba(226, 162, 147, 0.2); border: 1px solid ${color}; color: ${color}; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;"
+                                            onmouseover="this.style.background='rgba(226, 162, 147, 0.3)'"
+                                            onmouseout="this.style.background='rgba(226, 162, 147, 0.2)'">
+                                        Редактирай
+                                    </button>
+                                ` : ''}
+                                ${!analysis.is_processed ? 
+                                    `<button class="btn-primary" style="font-size: 10px; padding: 6px 12px; white-space: nowrap; background: ${color}; color: #1a1a2e; border: none; border-radius: 6px; font-weight: 600;" onclick="markProcessed(${analysis.id}, event)">
+                                        Обработен
+                                    </button>` : 
+                                    `<button style="background: rgba(226, 162, 147, 0.2); border: 1px solid ${color}; color: ${color}; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 10px; font-weight: 600; transition: all 0.2s;" 
+                                            onclick="markUnprocessed(${analysis.id}, event)"
+                                            onmouseover="this.style.background='rgba(226, 162, 147, 0.3)'"
+                                            onmouseout="this.style.background='rgba(226, 162, 147, 0.2)'">
+                                        Започни отново
+                                    </button>`
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Compact Person Data -->
+                        <div style="background: rgba(0, 0, 0, 0.15); padding: 14px; border-radius: 6px; border: 1px solid rgba(243, 239, 234, 0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                                <div>
+                                    <div style="font-size: 15px; font-weight: 700; color: #F3EFEA;">${analysis.person1_name}</div>
+                                    ${analysis.person1_gender ? `<div style="font-size: 11px; color: ${color}; margin-top: 2px;">${getGenderLabel(analysis.person1_gender)}</div>` : ''}
+                                </div>
+                                <button onclick="copyPersonData(${analysis.id}, 1); event.stopPropagation();" 
+                                        style="background: rgba(226, 162, 147, 0.2); color: ${color}; border: 1px solid ${color}; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 10px; font-weight: 600; transition: all 0.2s;"
+                                        onmouseover="this.style.background='rgba(226, 162, 147, 0.3)'" 
+                                        onmouseout="this.style.background='rgba(226, 162, 147, 0.2)'"
+                                        title="Копирай">
+                                    КОПИРАЙ
+                                </button>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 11px;">
+                                <div>
+                                    <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Раждане</div>
+                                    <div style="color: #F3EFEA; font-weight: 600;">${formatBirthDate(analysis.person1_birth_date)}</div>
+                                </div>
+                                <div>
+                                    <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Място</div>
+                                    <div style="color: #F3EFEA; font-weight: 600;">${analysis.person1_birth_place}</div>
+                                </div>
+                                <div>
+                                    <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Географска ширина</div>
+                                    <div style="font-family: 'Courier New', monospace; color: ${color}; font-weight: 600;">${analysis.person1_latitude ? analysis.person1_latitude.toFixed(4) + '°' : 'N/A'}</div>
+                                </div>
+                                <div>
+                                    <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Географска дължина</div>
+                                    <div style="font-family: 'Courier New', monospace; color: ${color}; font-weight: 600;">${analysis.person1_longitude ? analysis.person1_longitude.toFixed(4) + '°' : 'N/A'}</div>
+                                </div>
+                            </div>
+                            
+                            ${analysis.person1_birthday_location ? `
+                                <div style="margin-top: 14px; padding: 12px; background: rgba(135, 206, 235, 0.15); border-radius: 6px; border: 1px solid rgba(135, 206, 235, 0.3);">
+                                    <div style="color: #87CEEB; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">🎂 Място на празнуване на рожден ден${analysis.solar_return_year ? ` • Година: ${analysis.solar_return_year}` : ''}</div>
+                                    <div style="color: #F3EFEA; font-weight: 600; font-size: 12px; margin-bottom: 8px;">${analysis.person1_birthday_location}</div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
+                                        <div>
+                                            <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Географска ширина</div>
+                                            <div style="font-family: 'Courier New', monospace; color: #87CEEB; font-weight: 600;">${analysis.person1_birthday_latitude ? analysis.person1_birthday_latitude.toFixed(4) + '°' : 'N/A'}</div>
+                                        </div>
+                                        <div>
+                                            <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Географска дължина</div>
+                                            <div style="font-family: 'Courier New', monospace; color: #87CEEB; font-weight: 600;">${analysis.person1_birthday_longitude ? analysis.person1_birthday_longitude.toFixed(4) + '°' : 'N/A'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            ${analysis.person1_timezone ? `
+                                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(243, 239, 234, 0.1); font-size: 10px; color: rgba(243, 239, 234, 0.7);">
+                                    ${analysis.person1_timezone} (${analysis.person1_timezone_offset})
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        ${analysis.notes ? `
+                            <div style="margin-top: 12px; padding: 10px 12px; background: rgba(0, 0, 0, 0.15); border-radius: 6px; border-left: 2px solid ${color}; font-size: 11px; color: rgba(243, 239, 234, 0.85);">
+                                <strong style="color: ${color};">Бележка:</strong> ${analysis.notes}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
+            // For couple analysis (love_synastry) - wider card with two person sections
+            return `
+                <div style="background: #5F667B; padding: 18px; margin-bottom: 12px; border-radius: 8px; border-left: 3px solid ${color}; position: relative; ${analysis.is_processed ? 'opacity: 0.6; filter: grayscale(30%);' : ''}">
+                    
+                    <!-- Header with Product Info -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(243, 239, 234, 0.1);">
+                        <div style="flex: 1;">
+                            <div style="display: inline-block; background: rgba(226, 162, 147, 0.15); padding: 5px 12px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(226, 162, 147, 0.3);">
+                                <span style="color: ${color}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${productLabel}</span>
+                            </div>
+                            ${analysis.variant_title ? `
+                                <div style="background: rgba(246, 214, 208, 0.15); display: inline-block; padding: 4px 10px; border-radius: 6px; margin-left: 6px; border: 1px solid rgba(246, 214, 208, 0.25);">
+                                    <span style="font-size: 11px; color: #F6D6D0; font-weight: 600;">${analysis.variant_title}</span>
+                                </div>
+                            ` : ''}
+                            <div style="margin-top: 6px; font-size: 11px; color: rgba(243, 239, 234, 0.7);">
+                                ${analysis.product_title} • <span style="color: ${color}; font-weight: 600;">${analysis.price} ${order.currency}</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            ${analysis.drive_link ? `
+                                <button onclick="copyAnalysisDriveLink('${analysis.drive_link}', this); event.stopPropagation();"
+                                        style="background: rgba(130, 200, 130, 0.2); border: 1px solid #82C882; color: #82C882; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 700; transition: all 0.2s;"
+                                        onmouseover="this.style.background='rgba(130, 200, 130, 0.35)'"
+                                        onmouseout="this.style.background='rgba(130, 200, 130, 0.2)'">
+                                    🔗 Копирай линк
+                                </button>
+                            ` : ''}
+                            ${currentUser && currentUser.role === 'admin' ? `
+                                <button onclick="editAnalysis(${analysis.id}); event.stopPropagation();" 
+                                        style="background: rgba(226, 162, 147, 0.2); border: 1px solid ${color}; color: ${color}; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;"
+                                        onmouseover="this.style.background='rgba(226, 162, 147, 0.3)'"
+                                        onmouseout="this.style.background='rgba(226, 162, 147, 0.2)'">
+                                    Редактирай
+                                </button>
+                            ` : ''}
+                            ${!analysis.is_processed ? 
+                                `<button class="btn-primary" style="font-size: 10px; padding: 6px 12px; white-space: nowrap; background: ${color}; color: #1a1a2e; border: none; border-radius: 6px; font-weight: 600;" onclick="markProcessed(${analysis.id}, event)">
+                                    Обработен
+                                </button>` : 
+                                `<button style="background: rgba(226, 162, 147, 0.2); border: 1px solid ${color}; color: ${color}; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 10px; font-weight: 600; transition: all 0.2s;" 
+                                        onclick="markUnprocessed(${analysis.id}, event)"
+                                        onmouseover="this.style.background='rgba(226, 162, 147, 0.3)'"
+                                        onmouseout="this.style.background='rgba(226, 162, 147, 0.2)'">
+                                    Започни отново
+                                </button>`
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Two Person Cards Side by Side -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                        
+                        <!-- Person 1 -->
+                        <div style="background: rgba(0, 0, 0, 0.15); padding: 14px; border-radius: 6px; border: 1px solid rgba(243, 239, 234, 0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                                <div>
+                                    <div style="font-size: 14px; font-weight: 700; color: #F3EFEA;">${analysis.person1_name}</div>
+                                    ${analysis.person1_gender ? `<div style="font-size: 11px; color: ${color}; margin-top: 2px;">${getGenderLabel(analysis.person1_gender)}</div>` : ''}
+                                </div>
+                                <button onclick="copyPersonData(${analysis.id}, 1); event.stopPropagation();" 
+                                        style="background: rgba(226, 162, 147, 0.2); color: ${color}; border: 1px solid ${color}; padding: 5px 9px; border-radius: 6px; cursor: pointer; font-size: 10px; font-weight: 600; transition: all 0.2s;"
+                                        onmouseover="this.style.background='rgba(226, 162, 147, 0.3)'" 
+                                        onmouseout="this.style.background='rgba(226, 162, 147, 0.2)'"
+                                        title="Копирай">
+                                    КОПИРАЙ
+                                </button>
+                            </div>
+                            
+                            <div style="font-size: 11px;">
+                                <div style="margin-bottom: 10px;">
+                                    <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Раждане</div>
+                                    <div style="color: #F3EFEA; font-weight: 600;">${formatBirthDate(analysis.person1_birth_date)}</div>
+                                </div>
+                                <div style="margin-bottom: 10px;">
+                                    <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Място</div>
+                                    <div style="color: #F3EFEA; font-weight: 600;">${analysis.person1_birth_place}</div>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                                    <div>
+                                        <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Географска ширина</div>
+                                        <div style="font-family: 'Courier New', monospace; color: ${color}; font-weight: 600;">${analysis.person1_latitude ? analysis.person1_latitude.toFixed(4) + '°' : 'N/A'}</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Географска дължина</div>
+                                        <div style="font-family: 'Courier New', monospace; color: ${color}; font-weight: 600;">${analysis.person1_longitude ? analysis.person1_longitude.toFixed(4) + '°' : 'N/A'}</div>
+                                    </div>
+                                </div>
+                                ${analysis.person1_timezone ? `
+                                    <div style="padding-top: 8px; border-top: 1px solid rgba(243, 239, 234, 0.1); font-size: 10px; color: rgba(243, 239, 234, 0.7);">
+                                        ${analysis.person1_timezone} (${analysis.person1_timezone_offset})
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Person 2 -->
+                        <div style="background: rgba(0, 0, 0, 0.15); padding: 14px; border-radius: 6px; border: 1px solid rgba(243, 239, 234, 0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                                <div>
+                                    <div style="font-size: 14px; font-weight: 700; color: #F3EFEA;">${analysis.person2_name}</div>
+                                    ${analysis.person2_gender ? `<div style="font-size: 11px; color: ${color}; margin-top: 2px;">${getGenderLabel(analysis.person2_gender)}</div>` : ''}
+                                </div>
+                                <button onclick="copyPersonData(${analysis.id}, 2); event.stopPropagation();" 
+                                        style="background: rgba(226, 162, 147, 0.2); color: ${color}; border: 1px solid ${color}; padding: 5px 9px; border-radius: 6px; cursor: pointer; font-size: 10px; font-weight: 600; transition: all 0.2s;"
+                                        onmouseover="this.style.background='rgba(226, 162, 147, 0.3)'" 
+                                        onmouseout="this.style.background='rgba(226, 162, 147, 0.2)'"
+                                        title="Копирай">
+                                    КОПИРАЙ
+                                </button>
+                            </div>
+                            
+                            <div style="font-size: 11px;">
+                                <div style="margin-bottom: 10px;">
+                                    <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Раждане</div>
+                                    <div style="color: #F3EFEA; font-weight: 600;">${formatBirthDate(analysis.person2_birth_date)}</div>
+                                </div>
+                                <div style="margin-bottom: 10px;">
+                                    <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Място</div>
+                                    <div style="color: #F3EFEA; font-weight: 600;">${analysis.person2_birth_place}</div>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                                    <div>
+                                        <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Географска ширина</div>
+                                        <div style="font-family: 'Courier New', monospace; color: ${color}; font-weight: 600;">${analysis.person2_latitude ? analysis.person2_latitude.toFixed(4) + '°' : 'N/A'}</div>
+                                    </div>
+                                    <div>
+                                        <div style="color: rgba(243, 239, 234, 0.6); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Географска дължина</div>
+                                        <div style="font-family: 'Courier New', monospace; color: ${color}; font-weight: 600;">${analysis.person2_longitude ? analysis.person2_longitude.toFixed(4) + '°' : 'N/A'}</div>
+                                    </div>
+                                </div>
+                                ${analysis.person2_timezone ? `
+                                    <div style="padding-top: 8px; border-top: 1px solid rgba(243, 239, 234, 0.1); font-size: 10px; color: rgba(243, 239, 234, 0.7);">
+                                        ${analysis.person2_timezone} (${analysis.person2_timezone_offset})
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+
+                    ${analysis.notes ? `
+                        <div style="margin-top: 12px; padding: 10px 12px; background: rgba(0, 0, 0, 0.15); border-radius: 6px; border-left: 2px solid ${color}; font-size: 11px; color: rgba(243, 239, 234, 0.85);">
+                            <strong style="color: ${color};">Бележка:</strong> ${analysis.notes}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // Toggle row expansion
+        function toggleRow(orderId) {
+            if (expandedRows.has(orderId)) {
+                expandedRows.delete(orderId);
+            } else {
+                expandedRows.add(orderId);
+            }
+            displayOrders(filteredOrders);
+        }
+
+        // Mark analysis as processed
+        async function markProcessed(analysisId, event) {
+            event.stopPropagation();
+            
+            if (!confirm('Маркирате ли анализа като обработен?')) {
+                return;
+            }
+
+            try {
+                await fetchWithAuth(`/api/shopify/local/analyses/${analysisId}/mark-processed`, {
+                    method: 'PUT'
+                });
+
+                // Reload orders
+                await loadLocalOrders();
+            } catch (error) {
+                console.error('Error marking processed:', error);
+                alert('Грешка при маркиране');
+            }
+        }
+
+        async function markUnprocessed(analysisId, event) {
+            event.stopPropagation();
+            
+            if (!confirm('Маркирате ли анализа за повторна обработка?')) {
+                return;
+            }
+
+            try {
+                await fetchWithAuth(`/api/shopify/local/analyses/${analysisId}/mark-unprocessed`, {
+                    method: 'PUT'
+                });
+
+                // Reload orders
+                await loadLocalOrders();
+            } catch (error) {
+                console.error('Error marking unprocessed:', error);
+                alert('Грешка при маркиране');
+            }
+        }
+
+        // Delete order (admin only)
+        async function deleteOrder(orderId, orderNumber) {
+            if (!confirm(`Сигурни ли сте, че искате да изтриете поръчка #${orderNumber}?\n\nТова ще изтрие и всички анализи свързани с нея.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetchWithAuth(`/api/shopify/local/orders/${orderId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`✓ ${result.message}\n\nИзтрити анализи: ${result.deleted_analyses}`);
+                    await loadLocalOrders();
+                } else {
+                    const error = await response.json();
+                    alert(`Грешка: ${error.detail || 'Неуспешно изтриване'}`);
+                }
+            } catch (error) {
+                console.error('Error deleting order:', error);
+                alert('Грешка при изтриване на поръчка');
+            }
+        }
+
+        // Edit analysis (admin only)
+        function editAnalysis(analysisId) {
+            // Find the analysis in allOrders
+            let analysis = null;
+            for (const order of allOrders) {
+                const found = order.analyses?.find(a => a.id === analysisId);
+                if (found) {
+                    analysis = found;
+                    break;
+                }
+            }
+
+            if (!analysis) {
+                alert('Анализът не е намерен');
+                return;
+            }
+
+            // Populate edit modal with current values
+            document.getElementById('editAnalysisId').value = analysis.id;
+            document.getElementById('editPerson1Name').value = analysis.person1_name || '';
+            document.getElementById('editPerson1Gender').value = analysis.person1_gender || '';
+            // Parse datetime without timezone conversion for datetime-local input
+            document.getElementById('editPerson1BirthDate').value = analysis.person1_birth_date ? analysis.person1_birth_date.slice(0, 16) : '';
+            document.getElementById('editPerson1BirthPlace').value = analysis.person1_birth_place || '';
+            document.getElementById('editPerson1Latitude').value = analysis.person1_latitude || '';
+            document.getElementById('editPerson1Longitude').value = analysis.person1_longitude || '';
+
+            // Show/hide birthday location section for Solar Return
+            const isSolarReturn = analysis.product_type === 'solar_return';
+            document.getElementById('birthdayLocationSection').style.display = isSolarReturn ? 'block' : 'none';
+            
+            if (isSolarReturn) {
+                document.getElementById('editSolarReturnYear').value = analysis.solar_return_year || '';
+                document.getElementById('editPerson1BirthdayLocation').value = analysis.person1_birthday_location || '';
+                document.getElementById('editPerson1BirthdayLatitude').value = analysis.person1_birthday_latitude || '';
+                document.getElementById('editPerson1BirthdayLongitude').value = analysis.person1_birthday_longitude || '';
+            }
+
+            // Show/hide person 2 fields based on product type
+            const isCoupleAnalysis = analysis.product_type === 'love_synastry';
+            document.getElementById('person2Section').style.display = isCoupleAnalysis ? 'block' : 'none';
+
+            if (isCoupleAnalysis) {
+                document.getElementById('editPerson2Name').value = analysis.person2_name || '';
+                document.getElementById('editPerson2Gender').value = analysis.person2_gender || '';
+                // Parse datetime without timezone conversion for datetime-local input
+                document.getElementById('editPerson2BirthDate').value = analysis.person2_birth_date ? analysis.person2_birth_date.slice(0, 16) : '';
+                document.getElementById('editPerson2BirthPlace').value = analysis.person2_birth_place || '';
+                document.getElementById('editPerson2Latitude').value = analysis.person2_latitude || '';
+                document.getElementById('editPerson2Longitude').value = analysis.person2_longitude || '';
+            }
+
+            document.getElementById('editNotes').value = analysis.notes || '';
+
+            // Show modal
+            document.getElementById('editAnalysisModal').style.display = 'flex';
+        }
+
+        // Close edit modal
+        function closeEditModal() {
+            document.getElementById('editAnalysisModal').style.display = 'none';
+        }
+
+        // Save edited analysis
+        async function saveEditedAnalysis() {
+            const analysisId = document.getElementById('editAnalysisId').value;
+            
+            const data = {
+                person1_name: document.getElementById('editPerson1Name').value,
+                person1_gender: document.getElementById('editPerson1Gender').value,
+                person1_birth_date: document.getElementById('editPerson1BirthDate').value,
+                person1_birth_place: document.getElementById('editPerson1BirthPlace').value,
+                person1_latitude: parseFloat(document.getElementById('editPerson1Latitude').value),
+                person1_longitude: parseFloat(document.getElementById('editPerson1Longitude').value),
+                notes: document.getElementById('editNotes').value
+            };
+
+            // Add birthday location data if visible (for Solar Return)
+            if (document.getElementById('birthdayLocationSection').style.display !== 'none') {
+                const solarYear = document.getElementById('editSolarReturnYear').value;
+                if (solarYear) data.solar_return_year = parseInt(solarYear);
+                
+                data.person1_birthday_location = document.getElementById('editPerson1BirthdayLocation').value;
+                const birthdayLat = document.getElementById('editPerson1BirthdayLatitude').value;
+                const birthdayLon = document.getElementById('editPerson1BirthdayLongitude').value;
+                if (birthdayLat) data.person1_birthday_latitude = parseFloat(birthdayLat);
+                if (birthdayLon) data.person1_birthday_longitude = parseFloat(birthdayLon);
+            }
+
+            // Add person 2 data if visible
+            if (document.getElementById('person2Section').style.display !== 'none') {
+                data.person2_name = document.getElementById('editPerson2Name').value;
+                data.person2_gender = document.getElementById('editPerson2Gender').value;
+                data.person2_birth_date = document.getElementById('editPerson2BirthDate').value;
+                data.person2_birth_place = document.getElementById('editPerson2BirthPlace').value;
+                data.person2_latitude = parseFloat(document.getElementById('editPerson2Latitude').value);
+                data.person2_longitude = parseFloat(document.getElementById('editPerson2Longitude').value);
+            }
+
+            try {
+                const response = await fetchWithAuth(`/api/shopify/local/analyses/${analysisId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`✓ ${result.message}`);
+                    closeEditModal();
+                    await loadLocalOrders();
+                } else {
+                    const error = await response.json();
+                    alert(`Грешка: ${error.detail || 'Неуспешно редактиране'}`);
+                }
+            } catch (error) {
+                console.error('Error editing analysis:', error);
+                alert('Грешка при редактиране на анализ');
+            }
+        }
+
+        function getStatusClass(status) {
+            const statusMap = {
+                'paid': 'active',
+                'pending': 'inactive',
+                'refunded': 'inactive',
+                'partially_refunded': 'inactive',
+                'voided': 'inactive'
+            };
+            return statusMap[status] || 'inactive';
+        }
+
+        function getStatusLabel(status) {
+            const labels = {
+                'paid': 'Платена',
+                'pending': 'Изчаква',
+                'refunded': 'Възстановена',
+                'partially_refunded': 'Частично възстановена',
+                'voided': 'Анулирана',
+                'authorized': 'Одобрена'
+            };
+            return labels[status] || status;
+        }
+
+        function getGenderLabel(gender) {
+            const labels = {
+                'male': 'Мъж',
+                'female': 'Жена',
+                'other': 'Друго'
+            };
+            return labels[gender] || gender;
+        }
+
+        // Load current user info
+        async function loadCurrentUser() {
+            try {
+                const response = await fetchWithAuth('/api/auth/me');
+                currentUser = await response.json();
+
+                document.getElementById('currentUserName').textContent = 
+                    `${currentUser.first_name} ${currentUser.last_name}`;
+                document.getElementById('currentUserRole').textContent = 
+                    getRoleLabel(currentUser.role);
+            } catch (error) {
+                console.error('Error loading user info:', error);
+            }
+        }
+
+        function getRoleLabel(role) {
+            const labels = {
+                'admin': 'Администратор',
+                'editor': 'Редактор',
+                'user': 'Потребител'
+            };
+            return labels[role] || role;
+        }
+
+        // Initialize
+        async function init() {
+            checkAuth();
+            await loadCurrentUser();
+            await loadLocalOrders();
+        }
+
+        // Solar Return Chart Functions
+        let _currentChartAnalysisId = null;
+        let _currentChartData = null;  // live copy of the loaded chart JSON
+
+        async function viewSolarReturnChart(analysisId, hasCached) {
+            console.log(`Loading solar return chart for analysis ${analysisId} (cached: ${hasCached})`);
+            _currentChartAnalysisId = analysisId;
+
+            // Show modal with loading state
+            document.getElementById('chartModal').style.display = 'flex';
+            document.getElementById('chartLoading').style.display = 'block';
+            document.getElementById('chartContent').style.display = 'none';
+            document.getElementById('chartError').style.display = 'none';
+            document.getElementById('chartRegenBtn').style.display = 'none';
+            document.getElementById('chartEditBtn').style.display = 'none';
+            document.getElementById('chartLoadingText').textContent = hasCached
+                ? 'Зареждане от база данни...'
+                : 'Генериране на соларна карта...';
+
+            await _loadChartData(analysisId, false);
+        }
+
+        async function regenerateSolarChart() {
+            if (!_currentChartAnalysisId) return;
+            if (!confirm('Сигурни ли сте, че искате да регенерирате картата? Това ще извика API отново.')) return;
+
+            document.getElementById('chartLoading').style.display = 'block';
+            document.getElementById('chartContent').style.display = 'none';
+            document.getElementById('chartError').style.display = 'none';
+            document.getElementById('chartRegenBtn').style.display = 'none';
+            document.getElementById('chartEditBtn').style.display = 'none';
+            document.getElementById('chartLoadingText').textContent = 'Регенериране на соларна карта...';
+
+            await _loadChartData(_currentChartAnalysisId, true);
+            // Reload order list so button reflects new cache state
+            await loadLocalOrders();
+        }
+
+        async function _loadChartData(analysisId, regenerate) {
+            try {
+                const url = `/api/shopify/local/analyses/${analysisId}/solar-return-chart${regenerate ? '?regenerate=true' : ''}`;
+                const response = await fetchWithAuth(url);
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Грешка при зареждане на картата');
+                }
+
+                const data = await response.json();
+                console.log('Chart data received:', data);
+
+                // Update person info and cache status
+                document.getElementById('chartPersonInfo').textContent =
+                    `${data.person_name} • Година ${data.return_year}`;
+
+                const cacheEl = document.getElementById('chartCacheStatus');
+                if (data.cached) {
+                    const date = data.generated_at ? new Date(data.generated_at).toLocaleString('bg-BG') : '';
+                    cacheEl.innerHTML = `<span style="color: #87CEEB;">✅ От кеша${date ? ' • ' + date : ''}</span>`;
+                } else {
+                    cacheEl.innerHTML = `<span style="color: #aaa;">🆕 Новогенерирана и запазена</span>`;
+                }
+
+                // Show regenerate button
+                document.getElementById('chartRegenBtn').style.display = 'inline-block';
+
+                // Store chart data and show edit button
+                _currentChartData = data.chart_data;
+                document.getElementById('chartEditBtn').style.display = 'inline-block';
+
+                // Render chart
+                renderChartData(data.chart_data);
+
+                // Show content, hide loading
+                document.getElementById('chartLoading').style.display = 'none';
+                document.getElementById('chartContent').style.display = 'block';
+
+            } catch (error) {
+                console.error('Error loading solar return chart:', error);
+                document.getElementById('chartLoading').style.display = 'none';
+                document.getElementById('chartError').style.display = 'block';
+                document.getElementById('chartErrorMessage').textContent = error.message;
+            }
+        }
+
+        function closeChartModal() {
+            document.getElementById('chartModal').style.display = 'none';
+        }
+
+        // ============================================================
+        // Chart Edit Modal
+        // ============================================================
+
+        const _SIGN_OPTIONS = [
+            { code: 'Ari', label: 'Aries (Овен)' },
+            { code: 'Tau', label: 'Taurus (Телец)' },
+            { code: 'Gem', label: 'Gemini (Близнаци)' },
+            { code: 'Can', label: 'Cancer (Рак)' },
+            { code: 'Leo', label: 'Leo (Лъв)' },
+            { code: 'Vir', label: 'Virgo (Дева)' },
+            { code: 'Lib', label: 'Libra (Везни)' },
+            { code: 'Sco', label: 'Scorpio (Скорпион)' },
+            { code: 'Sag', label: 'Sagittarius (Стрелец)' },
+            { code: 'Cap', label: 'Capricorn (Козирог)' },
+            { code: 'Aqu', label: 'Aquarius (Водолей)' },
+            { code: 'Pis', label: 'Pisces (Риби)' },
+        ];
+
+        const _HOUSE_OPTIONS = [
+            { code: 'First_House',    label: 'I (1-ва)' },
+            { code: 'Second_House',   label: 'II (2-ра)' },
+            { code: 'Third_House',    label: 'III (3-та)' },
+            { code: 'Fourth_House',   label: 'IV (4-та)' },
+            { code: 'Fifth_House',    label: 'V (5-та)' },
+            { code: 'Sixth_House',    label: 'VI (6-та)' },
+            { code: 'Seventh_House',  label: 'VII (7-ма)' },
+            { code: 'Eighth_House',   label: 'VIII (8-ма)' },
+            { code: 'Ninth_House',    label: 'IX (9-та)' },
+            { code: 'Tenth_House',    label: 'X (10-та)' },
+            { code: 'Eleventh_House', label: 'XI (11-та)' },
+            { code: 'Twelfth_House',  label: 'XII (12-та)' },
+        ];
+
+        function _makeSelect(id, options, currentValue, labelKey) {
+            const sel = document.createElement('select');
+            sel.id = id;
+            sel.style.cssText = 'background:#0f0f1e; color:#F3EFEA; border:1px solid rgba(180,160,255,0.4); border-radius:6px; padding:5px 8px; font-size:12px; width:100%; cursor:pointer; outline:none;';
+            options.forEach(opt => {
+                const o = document.createElement('option');
+                o.value = opt.code;
+                o.textContent = opt[labelKey || 'label'];
+                if (opt.code === currentValue) o.selected = true;
+                sel.appendChild(o);
+            });
+            return sel;
+        }
+
+        function openChartEditModal() {
+            if (!_currentChartData) return;
+            const sd = _currentChartData.subject_data || _currentChartData;
+            const allNames = [
+                ...(sd.planets_names_list || []),
+                ...(sd.axial_cusps_names_list || [])
+            ];
+
+            const table = document.getElementById('chartEditTable');
+            table.innerHTML = '';
+
+            // Header row
+            const thead = table.createTHead();
+            const hr = thead.insertRow();
+            ['', 'Планета', 'Зодия', 'Дом'].forEach((h, i) => {
+                const th = document.createElement('th');
+                th.textContent = h;
+                th.style.cssText = `padding:8px 10px; text-align:${i === 0 ? 'center' : 'left'}; color:#B4A0FF; font-size:11px; font-weight:700; text-transform:uppercase; border-bottom:2px solid rgba(180,160,255,0.25); white-space:nowrap;`;
+                hr.appendChild(th);
+            });
+
+            const tbody = table.createTBody();
+            allNames.forEach((name, idx) => {
+                const key = name.toLowerCase();
+                const obj = sd[key];
+                if (!obj) return;
+
+                const tr = tbody.insertRow();
+                tr.style.cssText = `border-bottom:1px solid rgba(180,160,255,0.08); ${idx % 2 === 0 ? 'background:rgba(180,160,255,0.03);' : ''}`;
+
+                // Emoji
+                const tdEmoji = tr.insertCell();
+                tdEmoji.textContent = obj.emoji || '';
+                tdEmoji.style.cssText = 'padding:8px 10px; text-align:center; font-size:18px; width:38px;';
+
+                // Name
+                const tdName = tr.insertCell();
+                tdName.textContent = (obj.name || name).replace(/_/g, ' ');
+                tdName.style.cssText = 'padding:8px 10px; font-weight:700; color:#F3EFEA; font-size:13px; white-space:nowrap;';
+
+                // Sign dropdown
+                const tdSign = tr.insertCell();
+                tdSign.style.cssText = 'padding:6px 10px; min-width:170px;';
+                tdSign.appendChild(_makeSelect(`edit_sign_${key}`, _SIGN_OPTIONS, obj.sign));
+
+                // House dropdown
+                const tdHouse = tr.insertCell();
+                tdHouse.style.cssText = 'padding:6px 10px; min-width:130px;';
+                tdHouse.appendChild(_makeSelect(`edit_house_${key}`, _HOUSE_OPTIONS, obj.house));
+            });
+
+            document.getElementById('chartEditStatus').textContent = '';
+            document.getElementById('chartEditModal').style.display = 'flex';
+        }
+
+        function closeChartEditModal() {
+            document.getElementById('chartEditModal').style.display = 'none';
+        }
+
+        async function saveChartEdits(btn) {
+            if (!_currentChartData || !_currentChartAnalysisId) return;
+
+            // Deep-copy chart data
+            const updated = JSON.parse(JSON.stringify(_currentChartData));
+            const sd = updated.subject_data || updated;
+
+            const allNames = [
+                ...(sd.planets_names_list || []),
+                ...(sd.axial_cusps_names_list || [])
+            ];
+
+            allNames.forEach(name => {
+                const key = name.toLowerCase();
+                if (!sd[key]) return;
+                const signEl = document.getElementById(`edit_sign_${key}`);
+                const houseEl = document.getElementById(`edit_house_${key}`);
+                if (signEl) sd[key].sign = signEl.value;
+                if (houseEl) sd[key].house = houseEl.value;
+            });
+
+            const origText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Запазване...';
+            document.getElementById('chartEditStatus').textContent = '';
+
+            try {
+                const resp = await fetchWithAuth(
+                    `/api/shopify/local/analyses/${_currentChartAnalysisId}/solar-return-chart`,
+                    {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chart_data: updated }),
+                    }
+                );
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.detail || `HTTP ${resp.status}`);
+                }
+                const data = await resp.json();
+                // Update in-memory chart and re-render
+                _currentChartData = data.chart_data;
+                renderChartData(_currentChartData);
+                document.getElementById('chartEditStatus').innerHTML = '<span style="color:#64DC82;">✅ Запазено успешно</span>';
+                setTimeout(() => closeChartEditModal(), 900);
+            } catch (e) {
+                document.getElementById('chartEditStatus').innerHTML = `<span style="color:#E2A293;">❌ ${e.message}</span>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = origText;
+            }
+        }
+
+        // ============================================================
+        // Solar Return REPORT  (AI analysis via ChatGPT)
+        // ============================================================
+
+        const REPORT_SECTIONS = [
+            { key: 'yearly_summary',      label: 'Годината на кратко',               icon: '📅', alwaysShow: true  },
+            { key: 'planetary_positions', label: 'Планетарни позиции и акценти',      icon: '🪐', alwaysShow: true  },
+            { key: 'life_structure',      label: 'Как да структурираш живота си',     icon: '🏗️', alwaysShow: true  },
+            { key: 'main_theme',          label: 'Главната тема на годината',          icon: '⭐', alwaysShow: true  },
+            { key: 'yearly_details',      label: 'Годината в детайли',                icon: '🔭', alwaysShow: false },
+        ];
+
+        let _reportAnalysisId = null;
+        let _reportShowDetails = false;
+
+        async function viewSolarReport(analysisId) {
+            _reportAnalysisId = analysisId;
+
+            // Find analysis from allOrders
+            let analysis = null;
+            for (const order of allOrders) {
+                const found = order.analyses?.find(a => a.id === analysisId);
+                if (found) { analysis = found; break; }
+            }
+            if (!analysis) { alert('Анализът не е намерен'); return; }
+
+            // Determine if "Годината в детайли" should show
+            const vt = (analysis.variant_title || '').toLowerCase();
+            const pt = (analysis.product_title || '').toLowerCase();
+            const sk = (analysis.sku || '').toLowerCase();
+            console.log('[viewSolarReport] variant_title:', analysis.variant_title, '| product_title:', analysis.product_title, '| sku:', analysis.sku);
+            _reportShowDetails = vt.includes('подроб') || vt.includes('подороб') || vt.includes('vip') || vt.includes('detai')
+                               || pt.includes('подроб') || pt.includes('подороб') || pt.includes('vip') || pt.includes('detai')
+                               || sk.includes('подроб') || sk.includes('подороб') || sk.includes('vip') || sk.includes('detai');
+
+            document.getElementById('solarReportModal').style.display = 'flex';
+            document.getElementById('solarCardFloatBtn').style.display = 'flex';
+            document.getElementById('reportPersonInfo').textContent =
+                `${analysis.person1_name} • Година ${analysis.solar_return_year || '—'} • ${analysis.variant_title || analysis.product_title || ''}`;
+
+            // Build section editors
+            buildReportSections(_reportShowDetails);
+
+            // Load any existing saved report
+            await loadExistingReport(analysisId);
+        }
+
+        function closeSolarReportModal() {
+            document.getElementById('solarReportModal').style.display = 'none';
+            document.getElementById('solarCardFloatBtn').style.display = 'none';
+        }
+
+        function buildReportSections(showDetails) {
+            const container = document.getElementById('reportSectionsContainer');
+            container.innerHTML = '';
+
+            const visibleSections = REPORT_SECTIONS.filter(s => s.alwaysShow || showDetails);
+
+            visibleSections.forEach(section => {
+                const div = document.createElement('div');
+                div.id = `reportSection_${section.key}`;
+                div.style.cssText = 'margin-bottom: 28px; border-radius: 12px; border: 1px solid rgba(246,214,208,0.2); overflow: hidden;';
+                div.innerHTML = `
+                    <!-- Section Header -->
+                    <div style="background:rgba(246,214,208,0.08); padding:14px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(246,214,208,0.15);">
+                        <div style="font-size:15px; font-weight:700; color:#F6D6D0;">${section.icon} ${section.label}</div>
+                        <span id="reportStatus_${section.key}" style="font-size:11px; color:rgba(243,239,234,0.5);"></span>
+                    </div>
+
+                    <!-- Toolbar -->
+                    <div style="background:rgba(0,0,0,0.2); padding:8px 12px; display:flex; gap:6px; align-items:center; border-bottom:1px solid rgba(246,214,208,0.1); flex-wrap:wrap;">
+                        <button onclick="editorCmd('${section.key}','bold')" title="Удебелен" style="${_editorBtnStyle()}"><b>B</b></button>
+                        <button onclick="editorCmd('${section.key}','italic')" title="Курсив" style="${_editorBtnStyle()}"><i>I</i></button>
+                        <button onclick="editorCmd('${section.key}','underline')" title="Подчертан" style="${_editorBtnStyle()}"><u>U</u></button>
+                        <div style="width:1px; height:20px; background:rgba(243,239,234,0.2); margin:0 4px;"></div>
+                        <button onclick="editorCmd('${section.key}','insertUnorderedList')" title="Списък" style="${_editorBtnStyle()}">≡</button>
+                        <button onclick="editorCmd('${section.key}','insertOrderedList')" title="Номериран списък" style="${_editorBtnStyle()}">1.</button>
+                        <div style="width:1px; height:20px; background:rgba(243,239,234,0.2); margin:0 4px;"></div>
+                        <button onclick="editorCmd('${section.key}','removeFormat')" title="Изчисти форматиране" style="${_editorBtnStyle()}">✕</button>
+                    </div>
+
+                    <!-- Editor -->
+                    <div id="reportEditor_${section.key}"
+                         contenteditable="true"
+                         spellcheck="true"
+                         data-section="${section.key}"
+                         style="min-height:180px; padding:16px 18px; color:#F3EFEA; font-size:14px; line-height:1.75; outline:none; background:rgba(0,0,0,0.15); white-space:pre-wrap; word-break:break-word;"
+                    ></div>
+
+                    <!-- Loading overlay -->
+                    <div id="reportLoading_${section.key}" style="display:none; padding:18px 18px; color:#F6D6D0; font-size:13px; background:rgba(0,0,0,0.2); border-top:1px solid rgba(246,214,208,0.1);">
+                        <span style="animation:pulse 1.5s infinite;">⏳ Чичи пише...</span>
+                    </div>
+
+                    <!-- Footer buttons -->
+                    <div style="padding:12px 18px; display:flex; gap:10px; align-items:center; justify-content:flex-end; background:rgba(0,0,0,0.1); border-top:1px solid rgba(246,214,208,0.1);">
+                        <button onclick="openChichiDialog('${section.key}')"
+                                style="background:rgba(135,206,235,0.15); border:1px solid #87CEEB; color:#87CEEB; padding:8px 16px; border-radius:7px; cursor:pointer; font-size:12px; font-weight:700; transition:all 0.2s;"
+                                onmouseover="this.style.background='rgba(135,206,235,0.28)'" onmouseout="this.style.background='rgba(135,206,235,0.15)'">
+                            🤖 Питай Чичи
+                        </button>
+                        <button onclick="saveReportSection('${section.key}')"
+                                style="background:rgba(246,214,208,0.2); border:1px solid #F6D6D0; color:#F6D6D0; padding:8px 16px; border-radius:7px; cursor:pointer; font-size:12px; font-weight:700; transition:all 0.2s;"
+                                onmouseover="this.style.background='rgba(246,214,208,0.35)'" onmouseout="this.style.background='rgba(246,214,208,0.2)'">
+                            💾 Запази
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- Solar Card Popup ---
+        async function openSolarCardPopup() {
+            const popup = document.getElementById('solarCardPopup');
+            const loading = document.getElementById('solarCardPopupLoading');
+            const table = document.getElementById('solarCardPopupTable');
+            const error = document.getElementById('solarCardPopupError');
+
+            loading.style.display = 'block';
+            table.style.display = 'none';
+            error.style.display = 'none';
+            popup.style.display = 'flex';
+
+            try {
+                const resp = await fetchWithAuth(`/api/shopify/local/analyses/${_reportAnalysisId}/solar-return-chart`);
+                if (!resp.ok) throw new Error((await resp.json()).detail || 'Грешка');
+                const data = await resp.json();
+                table.innerHTML = _buildMiniChartTable(data.chart_data);
+                loading.style.display = 'none';
+                table.style.display = 'block';
+            } catch (e) {
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.textContent = '⚠️ ' + e.message;
+            }
+        }
+
+        function closeSolarCardPopup() {
+            document.getElementById('solarCardPopup').style.display = 'none';
+        }
+
+        function _buildMiniChartTable(chartData) {
+            if (!chartData) return '<div style="padding:20px;color:#E2A293;">Няма данни.</div>';
+            const raw = typeof chartData === 'string' ? JSON.parse(chartData) : chartData;
+            const sd = raw.subject_data || raw;
+            const SIGN_NAMES = {
+                Ari:'Aries',Tau:'Taurus',Gem:'Gemini',Can:'Cancer',Leo:'Leo',Vir:'Virgo',
+                Lib:'Libra',Sco:'Scorpio',Sag:'Sagittarius',Cap:'Capricorn',Aqu:'Aquarius',Pis:'Pisces'
+            };
+            const HOUSE_NUM = {
+                First_House:'I',Second_House:'II',Third_House:'III',Fourth_House:'IV',
+                Fifth_House:'V',Sixth_House:'VI',Seventh_House:'VII',Eighth_House:'VIII',
+                Ninth_House:'IX',Tenth_House:'X',Eleventh_House:'XI',Twelfth_House:'XII'
+            };
+            const allNames = [...(sd.planets_names_list||[]),...(sd.axial_cusps_names_list||[])];
+            const rows = allNames.map(name => {
+                const obj = sd[name.toLowerCase()];
+                if (!obj) return null;
+                return {
+                    emoji: obj.emoji||'',
+                    planet: (obj.name||name).replace(/_/g,' '),
+                    sign: SIGN_NAMES[obj.sign]||obj.sign||'',
+                    position: typeof obj.position==='number' ? obj.position.toFixed(2)+'°' : (obj.position||''),
+                    house: HOUSE_NUM[obj.house]||(obj.house||'').replace('_House','').replace(/_/g,' '),
+                    retrograde: obj.retrograde===true
+                };
+            }).filter(Boolean);
+            if (!rows.length) return '<div style="padding:20px;color:#E2A293;">Няма планетни данни.</div>';
+            return `<table style="width:100%;border-collapse:collapse;">
+                <thead><tr style="border-bottom:2px solid rgba(135,206,235,0.3);">
+                    <th style="padding:9px 12px;text-align:center;color:#87CEEB;font-size:11px;font-weight:700;text-transform:uppercase;width:40px;">Знак</th>
+                    <th style="padding:9px 12px;text-align:left;color:#87CEEB;font-size:11px;font-weight:700;text-transform:uppercase;">Планета</th>
+                    <th style="padding:9px 12px;text-align:center;color:#87CEEB;font-size:11px;font-weight:700;text-transform:uppercase;">Зодия</th>
+                    <th style="padding:9px 12px;text-align:right;color:#87CEEB;font-size:11px;font-weight:700;text-transform:uppercase;">Позиция</th>
+                    <th style="padding:9px 12px;text-align:center;color:#87CEEB;font-size:11px;font-weight:700;text-transform:uppercase;">Дом</th>
+                </tr></thead>
+                <tbody>${rows.map((r,i)=>`
+                    <tr style="border-bottom:1px solid rgba(135,206,235,0.08);${i%2===0?'background:rgba(135,206,235,0.04);':''}">
+                        <td style="padding:8px 12px;text-align:center;font-size:19px;line-height:1;">${r.emoji}</td>
+                        <td style="padding:8px 12px;font-weight:700;color:#F3EFEA;font-size:13px;">${r.planet}${r.retrograde?' <span style="color:#E2A293;font-size:11px;font-weight:400;">℞</span>':''}</td>
+                        <td style="padding:8px 12px;text-align:center;color:rgba(243,239,234,0.85);font-size:13px;">${r.sign}</td>
+                        <td style="padding:8px 12px;text-align:right;font-family:monospace;color:#87CEEB;font-weight:600;font-size:13px;">${r.position}</td>
+                        <td style="padding:8px 12px;text-align:center;color:rgba(243,239,234,0.7);font-size:14px;font-weight:700;">${r.house}</td>
+                    </tr>`).join('')}</tbody>
+            </table>`;
+        }
+
+        function _editorBtnStyle() {
+            return 'background:rgba(243,239,234,0.08); border:1px solid rgba(243,239,234,0.2); color:#F3EFEA; padding:4px 9px; border-radius:5px; cursor:pointer; font-size:12px; transition:all 0.15s;';
+        }
+
+        function editorCmd(sectionKey, cmd) {
+            const el = document.getElementById(`reportEditor_${sectionKey}`);
+            el.focus();
+            document.execCommand(cmd, false, null);
+        }
+
+        async function loadExistingReport(analysisId) {
+            try {
+                const response = await fetchWithAuth(`/api/shopify/local/analyses/${analysisId}/solar-report`);
+                if (!response.ok) return;
+                const report = await response.json();
+                REPORT_SECTIONS.forEach(s => {
+                    if (report[s.key]) {
+                        const el = document.getElementById(`reportEditor_${s.key}`);
+                        if (el) {
+                            el.innerHTML = report[s.key];
+                            _setStatus(s.key, '✅ Запазено');
+                        }
+                    }
+                });
+            } catch (e) {
+                console.warn('Could not load existing report:', e);
+            }
+        }
+
+        async function generateAllSections() {
+            const btn = document.getElementById('reportGenerateAllBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Генерира се...';
+
+            const visibleKeys = REPORT_SECTIONS
+                .filter(s => s.alwaysShow || _reportShowDetails)
+                .map(s => s.key);
+
+            // Generate sequentially: each section is generated, then saved,
+            // so the next section's prompt can include it as conversation history.
+            for (const key of visibleKeys) {
+                btn.textContent = `⏳ ${REPORT_SECTIONS.find(s => s.key === key)?.label || key}...`;
+                try {
+                    await askChichi(key);
+                    // Auto-save so the backend has this section for the next prompt
+                    await saveReportSection(key);
+                } catch (e) {
+                    console.error(`Generate-all: error on ${key}:`, e);
+                }
+            }
+
+            btn.disabled = false;
+            btn.textContent = '⚡ Генерирай всичко';
+        }
+
+        // --- Питай Чичи dialog state ---
+        let _chichiSectionKey = null;
+
+        function openChichiDialog(sectionKey) {
+            _chichiSectionKey = sectionKey;
+            const section = REPORT_SECTIONS.find(s => s.key === sectionKey);
+            document.getElementById('chichiDialogTitle').textContent =
+                `🤖 Питай Чичи — ${section ? section.label : sectionKey}`;
+            document.getElementById('chichiInstructionInput').value = '';
+            const dlg = document.getElementById('chichiDialog');
+            dlg.style.display = 'flex';
+            setTimeout(() => document.getElementById('chichiInstructionInput').focus(), 50);
+        }
+
+        function closeChichiDialog() {
+            document.getElementById('chichiDialog').style.display = 'none';
+            _chichiSectionKey = null;
+        }
+
+        async function submitChichiPrompt() {
+            const instruction = document.getElementById('chichiInstructionInput').value.trim();
+            if (!instruction) {
+                document.getElementById('chichiInstructionInput').focus();
+                return;
+            }
+            const sectionKey = _chichiSectionKey;
+            closeChichiDialog();
+
+            const loadingEl = document.getElementById(`reportLoading_${sectionKey}`);
+            const editorEl  = document.getElementById(`reportEditor_${sectionKey}`);
+            if (!loadingEl || !editorEl) return;
+
+            loadingEl.style.display = 'block';
+            _setStatus(sectionKey, '⏳ Чичи пише...');
+
+            try {
+                const response = await fetchWithAuth(
+                    `/api/shopify/local/analyses/${_reportAnalysisId}/solar-report/refine/${sectionKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_instruction: instruction,
+                            existing_content: editorEl.innerHTML,
+                        }),
+                    }
+                );
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.detail || `HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                editorEl.innerHTML = (data.content || '')
+                    .replace(/—/g, '-')
+                    .split(/\n\n+/)
+                    .filter(p => p.trim())
+                    .map(p => `<p style="margin:0 0 12px 0;">${p.replace(/\n/g, '<br>')}</p>`)
+                    .join('');
+                _setStatus(sectionKey, '✏️ Незапазено');
+            } catch (e) {
+                _setStatus(sectionKey, `❌ Грешка: ${e.message}`);
+            } finally {
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        // Used by "Генерирай всичко" — full regeneration, no dialog
+        async function askChichi(sectionKey) {
+            const loadingEl = document.getElementById(`reportLoading_${sectionKey}`);
+            const editorEl  = document.getElementById(`reportEditor_${sectionKey}`);
+            if (!loadingEl || !editorEl) return;
+
+            loadingEl.style.display = 'block';
+            _setStatus(sectionKey, '⏳ Генерира се...');
+
+            try {
+                const response = await fetchWithAuth(
+                    `/api/shopify/local/analyses/${_reportAnalysisId}/solar-report/generate/${sectionKey}`,
+                    { method: 'POST' }
+                );
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.detail || `HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                editorEl.innerHTML = (data.content || '')
+                    .replace(/—/g, '-')
+                    .split(/\n\n+/)
+                    .filter(p => p.trim())
+                    .map(p => `<p style="margin:0 0 12px 0;">${p.replace(/\n/g, '<br>')}</p>`)
+                    .join('');
+                _setStatus(sectionKey, '✏️ Незапазено');
+            } catch (e) {
+                _setStatus(sectionKey, `❌ Грешка: ${e.message}`);
+                console.error(`Section ${sectionKey} error:`, e);
+            } finally {
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        async function saveReportSection(sectionKey) {
+            const editorEl = document.getElementById(`reportEditor_${sectionKey}`);
+            if (!editorEl) return;
+
+            const content = editorEl.innerHTML.trim();
+            if (!content) {
+                alert('Редакторът е празен — нищо не е запазено.');
+                return;
+            }
+
+            _setStatus(sectionKey, '💾 Запазване...');
+            try {
+                const response = await fetchWithAuth(
+                    `/api/shopify/local/analyses/${_reportAnalysisId}/solar-report`,
+                    {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ section: sectionKey, content }),
+                    }
+                );
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.detail || `HTTP ${response.status}`);
+                }
+                _setStatus(sectionKey, '✅ Запазено');
+                // Refresh orders list so button reflects has_solar_report
+                await loadLocalOrders();
+            } catch (e) {
+                _setStatus(sectionKey, `❌ Грешка: ${e.message}`);
+            }
+        }
+
+        async function saveAllSections(btn) {
+            btn.disabled = true;
+            btn.textContent = '⏳ Запазване...';
+            const visibleKeys = REPORT_SECTIONS
+                .filter(s => s.alwaysShow || _reportShowDetails)
+                .map(s => s.key)
+                .filter(key => {
+                    const el = document.getElementById(`reportEditor_${key}`);
+                    return el && el.innerHTML.trim();
+                });
+            await Promise.allSettled(visibleKeys.map(key => saveReportSection(key)));
+            btn.disabled = false;
+            btn.textContent = '💾 Запази всичко';
+        }
+
+        async function copyReportText(btn) {
+            const visibleKeys = REPORT_SECTIONS.filter(s => s.alwaysShow || _reportShowDetails);
+            const parts = visibleKeys.map(section => {
+                const el = document.getElementById(`reportEditor_${section.key}`);
+                if (!el || !el.innerText.trim()) return null;
+                return `${section.label}\n${'─'.repeat(section.label.length)}\n${el.innerText.trim()}`;
+            }).filter(Boolean);
+
+            if (!parts.length) { alert('Няма текст за копиране.'); return; }
+            try {
+                await navigator.clipboard.writeText(parts.join('\n\n'));
+                const orig = btn.textContent;
+                btn.textContent = '✅ Копирано!';
+                setTimeout(() => btn.textContent = orig, 2000);
+            } catch (e) {
+                alert('Неуспешно копиране: ' + e.message);
+            }
+        }
+
+        function _setStatus(sectionKey, text) {
+            const el = document.getElementById(`reportStatus_${sectionKey}`);
+            if (el) el.textContent = text;
+        }
+
+        // ============================================================
+
+        function renderChartData(chartData) {
+            // Always show raw JSON in the collapsible section
+            document.getElementById('chartRawData').textContent = JSON.stringify(chartData, null, 2);
+
+            // Always hide the grid/aspects sections — we only use the single table
+            document.getElementById('chartGridSection').style.display = 'none';
+            document.getElementById('chartAspectsSection').style.display = 'none';
+
+            const sd = chartData && chartData.subject_data;
+            if (!sd) {
+                document.getElementById('chartMainTable').innerHTML =
+                    '<div style="padding: 20px; color: #E2A293;">Неизвестна структура на данните. Вижте JSON по-долу.</div>';
+                document.getElementById('chartMainSection').style.display = 'block';
+                return;
+            }
+
+            const SIGN_NAMES = {
+                Ari: 'Aries', Tau: 'Taurus', Gem: 'Gemini', Can: 'Cancer',
+                Leo: 'Leo', Vir: 'Virgo', Lib: 'Libra', Sco: 'Scorpio',
+                Sag: 'Sagittarius', Cap: 'Capricorn', Aqu: 'Aquarius', Pis: 'Pisces'
+            };
+
+            const HOUSE_NUM = {
+                First_House: 'I', Second_House: 'II', Third_House: 'III',
+                Fourth_House: 'IV', Fifth_House: 'V', Sixth_House: 'VI',
+                Seventh_House: 'VII', Eighth_House: 'VIII', Ninth_House: 'IX',
+                Tenth_House: 'X', Eleventh_House: 'XI', Twelfth_House: 'XII'
+            };
+
+            const allNames = [
+                ...(sd.planets_names_list || []),
+                ...(sd.axial_cusps_names_list || [])
+            ];
+
+            const rows = allNames.map(name => {
+                const key = name.toLowerCase();
+                const obj = sd[key];
+                if (!obj) return null;
+                return {
+                    emoji: obj.emoji || '',
+                    planet: (obj.name || name).replace(/_/g, ' '),
+                    sign: SIGN_NAMES[obj.sign] || obj.sign || '',
+                    position: typeof obj.position === 'number' ? obj.position.toFixed(2) + '°' : (obj.position || ''),
+                    house: HOUSE_NUM[obj.house] || (obj.house || '').replace('_House', '').replace(/_/g, ' '),
+                    retrograde: obj.retrograde === true
+                };
+            }).filter(Boolean);
+
+            if (rows.length === 0) {
+                document.getElementById('chartMainTable').innerHTML =
+                    '<div style="padding: 20px; color: #E2A293;">Няма планетни данни в отговора.</div>';
+                document.getElementById('chartMainSection').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('chartMainTable').innerHTML = `
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid rgba(135, 206, 235, 0.3);">
+                            <th style="padding: 10px 14px; text-align: center; color: #87CEEB; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; width: 44px;">Знак</th>
+                            <th style="padding: 10px 14px; text-align: left; color: #87CEEB; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Планета</th>
+                            <th style="padding: 10px 14px; text-align: center; color: #87CEEB; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Зодия</th>
+                            <th style="padding: 10px 14px; text-align: right; color: #87CEEB; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Позиция</th>
+                            <th style="padding: 10px 14px; text-align: center; color: #87CEEB; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Къща</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map((row, i) => `
+                            <tr style="border-bottom: 1px solid rgba(135, 206, 235, 0.08); ${i % 2 === 0 ? 'background: rgba(135, 206, 235, 0.04);' : ''}">
+                                <td style="padding: 10px 14px; text-align: center; font-size: 20px; line-height: 1;">${row.emoji}</td>
+                                <td style="padding: 10px 14px; font-weight: 700; color: #F3EFEA; font-size: 13px;">
+                                    ${row.planet}${row.retrograde ? ' <span style="color: #E2A293; font-size: 11px; font-weight: 400;">℞</span>' : ''}
+                                </td>
+                                <td style="padding: 10px 14px; text-align: center; color: rgba(243, 239, 234, 0.85); font-size: 13px;">${row.sign}</td>
+                                <td style="padding: 10px 14px; text-align: right; font-family: 'Courier New', monospace; color: #87CEEB; font-weight: 600; font-size: 13px;">${row.position}</td>
+                                <td style="padding: 10px 14px; text-align: center; color: rgba(243, 239, 234, 0.7); font-size: 14px; font-weight: 700;">${row.house}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            document.getElementById('chartMainSection').style.display = 'block';
+        }
+
+        // ============================================================
+        // PDF Generation + Job Queue
+        // ============================================================
+
+        const _pdfJobs = {};  // job_id → { id, status, person_name, year }
+        let _pdfPollInterval = null;
+
+        async function requestPdfGeneration(btn) {
+            if (!_reportAnalysisId) return;
+            const orig = btn.textContent;
+            btn.textContent = '⏳ …';
+            btn.disabled = true;
+            try {
+                const resp = await fetchWithAuth(
+                    `/api/shopify/local/analyses/${_reportAnalysisId}/pdf`,
+                    { method: 'POST' }
+                );
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.detail || `HTTP ${resp.status}`);
+                }
+                const data = await resp.json();
+                _pdfJobs[data.job_id] = {
+                    id: data.job_id,
+                    status: 'pending',
+                    person_name: data.person_name,
+                    year: data.solar_return_year,
+                };
+                _showPdfQueueBtn();
+                _renderPdfJobsList();
+                _startPdfPolling();
+                btn.textContent = '✅ В опашката';
+                setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500);
+            } catch (e) {
+                alert('Грешка при генериране на PDF: ' + e.message);
+                btn.textContent = orig;
+                btn.disabled = false;
+            }
+        }
+
+        function togglePdfPanel() {
+            const panel = document.getElementById('pdfJobsPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function _showPdfQueueBtn() {
+            document.getElementById('pdfQueueFloatBtn').style.display = 'flex';
+        }
+
+        function _renderPdfJobsList() {
+            const list = document.getElementById('pdfJobsList');
+            const jobs = Object.values(_pdfJobs);
+            if (!jobs.length) {
+                list.innerHTML = '<div style="padding:12px 16px; color:rgba(243,239,234,0.4); font-size:12px;">Няма активни задачи.</div>';
+                return;
+            }
+            list.innerHTML = jobs.sort((a,b) => b.id - a.id).map(job => {
+                const statusColor = { pending:'#FFC864', processing:'#87CEEB', done:'#64DC82', failed:'#E2A293' }[job.status] || '#aaa';
+                const statusLabel = { pending:'⏳ Изчакване', processing:'⚙️ Генериране...', done:'✅ Готово', failed:'❌ Грешка' }[job.status] || job.status;
+                const downloadBtn = job.status === 'done'
+                    ? `<button onclick="downloadPdf(${job.id})" style="margin-top:6px; padding:5px 12px; background:rgba(100,220,130,0.2);
+                          border:1px solid #64DC82; color:#64DC82; border-radius:6px; cursor:pointer;
+                          font-size:11px; font-weight:700;">⬇️ Изтегли PDF</button>` : '';
+                const copyLinkBtn = (job.status === 'done' && job.drive_link)
+                    ? `<button onclick="_copyDriveLink('${job.id}', this)" style="margin-top:6px; margin-left:6px; padding:5px 12px; background:rgba(100,160,255,0.15);
+                          border:1px solid #87AEFF; color:#87AEFF; border-radius:6px; cursor:pointer;
+                          font-size:11px; font-weight:700;">🔗 Копирай линк</button>` : '';
+                return `<div style="padding:10px 16px; border-bottom:1px solid rgba(255,200,100,0.1);">
+                    <div style="font-size:12px; font-weight:700; color:#F3EFEA;">${job.person_name || '—'} · ${job.year || '—'}</div>
+                    <div style="font-size:11px; color:${statusColor}; margin-top:3px;">${statusLabel}</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:0;">${downloadBtn}${copyLinkBtn}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function _updateQueueBadge() {
+            const active = Object.values(_pdfJobs).filter(j => j.status === 'pending' || j.status === 'processing').length;
+            const badge = document.getElementById('pdfQueueBadge');
+            if (active > 0) {
+                badge.style.display = 'block';
+                badge.textContent = active;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        function _startPdfPolling() {
+            if (_pdfPollInterval) return;  // already polling
+            _pdfPollInterval = setInterval(async () => {
+                const pending = Object.values(_pdfJobs).filter(j => j.status === 'pending' || j.status === 'processing');
+                const doneNoLink = Object.values(_pdfJobs).filter(j => j.status === 'done' && !j.drive_link);
+                const toPoll = [...pending, ...doneNoLink];
+                if (!toPoll.length) {
+                    clearInterval(_pdfPollInterval);
+                    _pdfPollInterval = null;
+                    return;
+                }
+                for (const job of toPoll) {
+                    try {
+                        const resp = await fetchWithAuth(`/api/shopify/local/pdf-jobs/${job.id}`);
+                        if (!resp.ok) continue;
+                        const data = await resp.json();
+                        const prevStatus = job.status;
+                        job.status = data.status;
+                        if (!job.person_name && data.person_name) job.person_name = data.person_name;
+                        if (!job.year && data.solar_return_year) job.year = data.solar_return_year;
+                        if (data.drive_link) job.drive_link = data.drive_link;
+                        if (data.status === 'done' && prevStatus !== 'done') {
+                            _showPdfDoneToast(job);
+                        }
+                    } catch (_) { /* ignore transient errors */ }
+                }
+                _renderPdfJobsList();
+                _updateQueueBadge();
+            }, 3000);
+        }
+
+        function _showPdfDoneToast(job) {
+            const toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:9999; background:rgba(20,28,20,0.97); border:1px solid #64DC82; color:#64DC82; padding:14px 22px; border-radius:12px; font-size:13px; font-weight:700; box-shadow:0 6px 24px rgba(0,0,0,0.7); backdrop-filter:blur(8px); text-align:center; max-width:340px;';
+            const copyBtn = job.drive_link
+                ? `<button onclick="_copyDriveLink('${job.id}', this)"
+                     style="margin-top:8px; margin-left:6px; padding:6px 14px; background:rgba(100,160,255,0.15); border:1px solid #87AEFF; color:#87AEFF; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700;">🔗 Копирай линк</button>`
+                : '';
+            toast.innerHTML = `✅ PDF готов!<br><span style="font-weight:400; font-size:12px; color:rgba(243,239,234,0.8);">${job.person_name || ''} · ${job.year || ''}</span><br>
+                <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:4px; margin-top:4px;">
+                  <button onclick="downloadPdf(${job.id}); this.closest('div[style*=fixed]').remove();"
+                     style="padding:6px 14px; background:rgba(100,220,130,0.2); border:1px solid #64DC82; color:#64DC82; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700;">⬇️ Изтегли PDF</button>
+                  ${copyBtn}
+                </div>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 12000);
+        }
+
+        function _copyDriveLink(jobId, btn) {
+            const job = _pdfJobs[jobId];
+            if (!job || !job.drive_link) return;
+            navigator.clipboard.writeText(job.drive_link).then(() => {
+                const orig = btn.textContent;
+                btn.textContent = '✅ Копирано!';
+                setTimeout(() => { btn.textContent = orig; }, 2000);
+            }).catch(() => {
+                // Fallback for environments where clipboard API is unavailable
+                const ta = document.createElement('textarea');
+                ta.value = job.drive_link;
+                ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                ta.remove();
+                const orig = btn.textContent;
+                btn.textContent = '✅ Копирано!';
+                setTimeout(() => { btn.textContent = orig; }, 2000);
+            });
+        }
+
+        function copyAnalysisDriveLink(link, btn) {
+            navigator.clipboard.writeText(link).then(() => {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '✅ Копирано!';
+                setTimeout(() => { btn.innerHTML = orig; }, 2000);
+            }).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = link;
+                ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                ta.remove();
+                const orig = btn.innerHTML;
+                btn.innerHTML = '✅ Копирано!';
+                setTimeout(() => { btn.innerHTML = orig; }, 2000);
+            });
+        }
+
+        async function downloadPdf(jobId) {
+            try {
+                const resp = await fetchWithAuth(`/api/shopify/local/pdf-jobs/${jobId}/download`);
+                if (!resp.ok) { alert('PDF не е намерен.'); return; }
+                const blob = await resp.blob();
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                const cd   = resp.headers.get('content-disposition') || '';
+                const matchRfc = cd.match(/filename\*=(?:UTF-8|utf-8)''([^;]+)/);
+                const matchPlain = cd.match(/filename="?([^";]+)"?/);
+                const match = matchRfc || matchPlain;
+                a.download = match ? decodeURIComponent(match[1]) : `Astronova_${jobId}.pdf`;
+                a.href = url;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+            } catch (e) {
+                alert('Грешка при изтегляне: ' + e.message);
+            }
+        }
+
+        init();
+    </script>
+
+    <!-- ===================== PDF Job Queue Panel ===================== -->
+    <div id="pdfJobsPanel" style="display:none; position:fixed; bottom:90px; right:20px; z-index:3200;
+         width:300px; max-height:360px; overflow-y:auto; background:rgba(14,14,28,0.97);
+         border:1px solid rgba(255,200,100,0.35); border-radius:14px;
+         box-shadow:0 8px 32px rgba(0,0,0,0.8); backdrop-filter:blur(10px);">
+        <div style="padding:12px 16px; border-bottom:1px solid rgba(255,200,100,0.2); display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#FFC864; font-size:13px; font-weight:700;">📄 PDF опашка</span>
+            <button onclick="document.getElementById('pdfJobsPanel').style.display='none';"
+                    style="background:none; border:none; color:rgba(243,239,234,0.5); font-size:18px; cursor:pointer; line-height:1; padding:0 4px;">&times;</button>
+        </div>
+        <div id="pdfJobsList" style="padding:8px 0;"></div>
+    </div>
+
+    <!-- Floating PDF queue toggle — shown when there are active/recent jobs -->
+    <button id="pdfQueueFloatBtn" onclick="togglePdfPanel()"
+            style="display:none; position:fixed; bottom:88px; right:28px; z-index:3150;
+                   width:44px; height:44px; border-radius:50%; border:2px solid rgba(255,200,100,0.7);
+                   background:rgba(14,14,28,0.95); color:#FFC864; font-size:18px; cursor:pointer;
+                   align-items:center; justify-content:center; box-shadow:0 4px 20px rgba(0,0,0,0.7);
+                   transition:all 0.2s; backdrop-filter:blur(6px);"
+            onmouseover="this.style.background='rgba(255,200,100,0.2)'; this.style.transform='scale(1.1)';"
+            onmouseout="this.style.background='rgba(14,14,28,0.95)'; this.style.transform='scale(1)';"
+            title="PDF опашка">📄<span id="pdfQueueBadge" style="display:none; position:absolute; top:-4px; right:-4px; width:16px; height:16px; border-radius:50%; background:#e74c3c; color:white; font-size:9px; line-height:16px; text-align:center; font-weight:700;"></span></button>
+
+    <!-- Floating solar card button — visible only when report modal is open -->
+    <button id="solarCardFloatBtn" onclick="openSolarCardPopup()"
+            style="display:none; position:fixed; bottom:28px; right:28px; z-index:3100;
+                   width:52px; height:52px; border-radius:50%; border:2px solid rgba(135,206,235,0.6);
+                   background:rgba(18,18,40,0.95); color:#87CEEB; font-size:22px; cursor:pointer;
+                   align-items:center; justify-content:center; box-shadow:0 4px 20px rgba(0,0,0,0.7);
+                   transition:all 0.2s; backdrop-filter:blur(6px);"
+            onmouseover="this.style.background='rgba(135,206,235,0.2)'; this.style.transform='scale(1.1)';"
+            onmouseout="this.style.background='rgba(18,18,40,0.95)'; this.style.transform='scale(1)';"
+            title="Виж соларна карта">🔭</button>
+</body>
+</html>

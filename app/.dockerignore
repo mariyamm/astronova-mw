@@ -1,0 +1,80 @@
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+env/
+.env*
+.venv/
+venv/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Test files
+test_*/
+tests/
+*_test.py
+pytest.ini
+.pytest_cache/
+
+# Development files
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+
+# Local environment files
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Output directories that will be created at runtime
+pdf_output/
+uploads/
+
+# Docker files (exclude from context to prevent invalidating cache)
+Dockerfile*
+docker-compose*.yml

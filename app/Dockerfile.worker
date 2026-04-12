@@ -1,0 +1,82 @@
+FROM python:3.11-slim
+
+# Labels for metadata
+LABEL maintainer="AstroNova Team"
+LABEL version="1.0.0"
+LABEL description="AstroNova - Celery Worker for PDF Generation"
+LABEL component="worker"
+
+# Set environment variables optimized for worker processes
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    # Worker-specific optimizations
+    CELERY_WORKER_MAX_MEMORY_PER_CHILD=512000 \
+    CELERY_WORKER_CONCURRENCY=2 \
+    # Prevent core dumps and reduce memory usage
+    MALLOC_TRIM_THRESHOLD_=100000 \
+    MALLOC_MMAP_THRESHOLD_=100000 \
+    MALLOC_MMAP_MAX_=65536
+
+# Install system dependencies required for PDF generation + fonts
+# WeasyPrint needs these libraries for rendering HTML to PDF
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Core WeasyPrint dependencies
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf-xlib-2.0-0 \
+    libcairo2 \
+    libffi-dev \
+    libglib2.0-0 \
+    shared-mime-info \
+    # Font support (including Cyrillic for Bulgarian text)
+    fonts-liberation \
+    fonts-dejavu-core \
+    fonts-noto \
+    fonts-noto-color-emoji \
+    fontconfig \
+    # Utilities  
+    curl \
+    # Clean up in same layer to reduce image size
+    && fc-cache -fv \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/cache/apt/archives/*
+
+# Create non-root user for security
+RUN groupadd --gid 1001 worker && \
+    useradd --uid 1001 --gid 1001 --shell /bin/bash --create-home worker
+
+# Set working directory
+WORKDIR /app
+
+# Install Python dependencies (do this before copying app code for better caching)
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    # Worker-specific packages that might not be in main requirements
+    pip install --no-cache-dir psutil
+
+# Create necessary directories and set permissions
+RUN mkdir -p /app/pdf_output /app/logs /app/temp && \
+    chown -R worker:worker /app
+
+# Copy application code
+COPY --chown=worker:worker . .
+
+# Switch to non-root user
+USER worker
+
+# Worker-specific health check (checks if Celery worker is responding)
+HEALTHCHECK --interval=60s --timeout=30s --start-period=30s --retries=3 \
+    CMD celery -A services.pdf_tasks inspect ping -d celery@$HOSTNAME || exit 1
+
+# Default command for Celery worker
+# Can be overridden in docker-compose.yml
+CMD ["celery", "-A", "services.pdf_tasks", "worker", \
+     "--loglevel=info", \
+     "--concurrency=2", \
+     "-Q", "pdf", \
+     "--max-tasks-per-child=1000", \
+     "--prefetch-multiplier=1", \
+     "--without-gossip"]
