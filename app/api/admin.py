@@ -3,10 +3,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 from datetime import datetime
 
-from db.database import get_db
-from models.user import User
-from models.permission import Permission
-from auth.dependencies import get_current_admin
+from app.db.database import get_db
+from app.models.user import User
+from app.models.permission import Permission
+from app.auth.dependencies import get_current_admin
 
 
 router = APIRouter(prefix="/api/admin", tags=["Admin Dashboard"])
