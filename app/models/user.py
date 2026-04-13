@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Table, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from db.database import Base
+from app.db.database import Base
 
 
 # Association table for many-to-many relationship between users and permissions

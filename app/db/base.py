@@ -1,4 +1,4 @@
-from db.database import Base
+from app.db.database import Base
 
 
 # Import all models here to make them available for Alembic

@@ -2,12 +2,12 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from db.database import get_db
-from models.user import User
-from models.permission import Permission
-from schemas.user import UserCreate, UserUpdate, UserResponse
-from core.security import get_password_hash
-from auth.dependencies import get_current_admin
+from app.db.database import get_db
+from app.models.user import User
+from app.models.permission import Permission
+from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.core.security import get_password_hash
+from app.auth.dependencies import get_current_admin
 
 
 router = APIRouter(prefix="/api/users", tags=["Users"])

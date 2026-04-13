@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from db.database import Base
-from models.user import user_permissions
+from app.db.database import Base
+from app.models.user import user_permissions
 
 
 class Permission(Base):

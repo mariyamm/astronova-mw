@@ -14,15 +14,15 @@ import base64
 import os
 import re
 
-from db.database import get_db
-from services.shopify_client import shopify_client
-from services.shopify_sync import shopify_sync_service
-from models.user import User
-from models.shopify_order import ShopifyOrder, Analysis, SolarReturnChart, SolarReturnReport, PdfJob, PdfJobStatus
-from schemas.shopify_order import ShopifyOrderResponse, AnalysisResponse, AnalysisUpdate, SolarReportSave, SolarReportRefine, SolarReportResponse
-from auth.dependencies import get_current_user
-from permissions.codes import SHOPIFY_ORDERS_VIEW
-from core.config import settings
+from app.db.database import get_db
+from app.services.shopify_client import shopify_client
+from app.services.shopify_sync import shopify_sync_service
+from app.models.user import User
+from app.models.shopify_order import ShopifyOrder, Analysis, SolarReturnChart, SolarReturnReport, PdfJob, PdfJobStatus
+from app.schemas.shopify_order import ShopifyOrderResponse, AnalysisResponse, AnalysisUpdate, SolarReportSave, SolarReportRefine, SolarReportResponse
+from app.auth.dependencies import get_current_user
+from app.permissions.codes import SHOPIFY_ORDERS_VIEW
+from app.core.config import settings
 
 
 router = APIRouter(prefix="/api/shopify", tags=["Shopify"])
