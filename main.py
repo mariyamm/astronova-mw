@@ -10,11 +10,11 @@ from fastapi import Request
 import json, httpx
 
 # Import API routers
-from api.auth import router as auth_router
-from api.users import router as users_router
-from api.permissions import router as permissions_router
-from api.admin import router as admin_router
-from api.shopify import router as shopify_router
+from app.api.auth import router as auth_router
+from app.api.users import router as users_router
+from app.api.permissions import router as permissions_router
+from app.api.admin import router as admin_router
+from app.api.shopify import router as shopify_router
 
 app = FastAPI(
     title="AstroNova API",
