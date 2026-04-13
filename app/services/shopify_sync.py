@@ -9,9 +9,9 @@ from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from datetime import datetime
 
-from models.shopify_order import ShopifyOrder, Analysis, ProductType
-from services.shopify_client import shopify_client
-from services.shopify_parser import shopify_parser
+from app.models.shopify_order import ShopifyOrder, Analysis, ProductType
+from app.services.shopify_client import shopify_client
+from app.services.shopify_parser import shopify_parser
 
 
 class ShopifySyncService:

@@ -6,8 +6,8 @@ This service parses Shopify line items and extracts person data from properties
 
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from models.shopify_order import ProductType, Gender
-from services.timezone_service import timezone_service
+from app.models.shopify_order import ProductType, Gender
+from app.services.timezone_service import timezone_service
 
 
 class ShopifyDataParser:

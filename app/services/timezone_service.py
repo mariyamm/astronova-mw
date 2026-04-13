@@ -7,7 +7,7 @@ This service calculates timezone information based on geographic coordinates
 from datetime import datetime
 from typing import Tuple, Optional
 import httpx
-from core.config import settings
+from app.core.config import settings
 
 
 class TimezoneService:

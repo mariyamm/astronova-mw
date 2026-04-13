@@ -7,7 +7,7 @@ This service handles all interactions with the Shopify API
 import httpx
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from core.config import settings
+from app.core.config import settings
 
 
 class ShopifyClient:
