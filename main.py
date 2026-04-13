@@ -132,10 +132,20 @@ async def gdrive_callback(request: Request):
     
 
 # Mount static files AFTER defining routes to avoid conflicts
-# This serves all files in the static directory at the root level
+# This serves all files in the static directory at the root level  
 import os
-static_dir = "static" if os.path.exists("static") else "app/static"
-app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+app.mount("/", StaticFiles(directory="app/static", html=True), name="static")
+
+
+@app.get("/debug")
+async def debug():
+    """Debug endpoint to test if app is working"""
+    import os
+    return {
+        "status": "working", 
+        "static_files": os.listdir("app/static") if os.path.exists("app/static") else [],
+        "working_dir": os.getcwd()
+    }
 
 
 @app.get("/health")
