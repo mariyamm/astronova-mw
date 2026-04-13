@@ -1,7 +1,7 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from datetime import datetime
-from schemas.permission import PermissionResponse
+from app.schemas.permission import PermissionResponse
 
 
 class UserBase(BaseModel):
